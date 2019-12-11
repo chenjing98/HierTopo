@@ -76,6 +76,36 @@ class GraphConvolution(Layer):
         x = inputs
         x = tf.nn.dropout(x, 1-self.dropout)
         x = tf.matmul(x, self.vars['weights'])
-        x = tf.sparse_tensor_dense_matmul(self.adj, x)
+        x = tf.matmul(self.adj, x)
         outputs = self.act(x)
         return outputs
+
+
+class GCNLayer(tf.keras.layers.Layer):
+    def __init__(self, output_dim, activation=tf.nn.relu, **kwargs):
+        self.output_dim = output_dim
+        self.activation = activation
+        super().__init__(**kwargs)
+
+    def build(self, input_shape):   # [batch_size, num_vertices, num_vertices], [batch_size, num_vertices, num_features]
+        A_shape, H_shape = input_shape
+        self.num_vertices = A_shape[1].value
+        self.W = self.add_weight(   # [num_features, output_dim]
+            name='W',
+            shape=[H_shape[2].value, self.output_dim]
+        )
+        super().build(input_shape)
+
+    def call(self, inputs, **kwargs):
+        """
+        :param inputs:  A for adjacent matrix [batch_size, num_vertices, num_vertices] (should be normalized in advance)
+                        H for features [batch_size, num_vertices, num_features]
+        """
+        A, H = inputs[0], inputs[1]
+        # A * H * W [batch_size, num_vertices, num_vertices] * [batch_size, num_vertices, num_features] * [num_features, output_dim]
+        # see https://www.tensorflow.org/api_docs/python/tf/tensordot and https://www.machenxiao.com/blog/tensordot
+        # for tf.tensordot()
+        H_next = tf.tensordot(tf.matmul(A, H), self.W, axes=[2, 0])
+        if self.activation is not None:
+            H_next = self.activation(H_next)
+        return H_next

@@ -10,10 +10,12 @@ import numpy as np
 
 class TopoEnv(gym.Env):
 
-    def __init__(self, dataset):
-        self.dataset = dataset
+    def __init__(self, fpath='10M_8_3.0_const3.pk3'):
+        with open(fpath, 'rb') as f:
+            self.dataset = pk.load(f)
 
         self.penalty = 1
+        self.degree_penalty = 10
         self.max_action = 50
 
         self.trace_index = np.random.randint(len(dataset))
@@ -45,7 +47,7 @@ class TopoEnv(gym.Env):
             else:   # Redundant edges
                 reward = -self.penalty
         else:   # Node degree violation
-            reward = -self.penalty
+            reward = -self.degree_penalty
         
         self.counter += 1
         if stop:

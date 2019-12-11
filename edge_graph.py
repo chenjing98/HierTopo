@@ -44,3 +44,12 @@ def get_features(edge_graph):
     for i in range(edge_graph.number_of_nodes):
         features.append(feature_list[i][1]['feature'])
     return np.array(features)
+
+def cal_node_id(e_id, num_nodes):
+    for i in range(num_nodes):
+        if (i+1)*(num_nodes-(i+2)/2) - 1 < e_id:
+            continue
+        for j in range(i+1, num_nodes):
+            if edge_id(i, j) == e_id:
+                return i, j
+    return None

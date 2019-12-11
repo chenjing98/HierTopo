@@ -49,17 +49,16 @@ class ActorNetwork(object):
             adj = tflearn.input_data(shape=[None, self.s_dim[0], self.s_dim[0]])    # Node * Node
             features = tflearn.input_data(shape=[None, self.s_dim[0], self.s_dim[1]])   # Node * 7
 
-            hidden1 = GraphConvolution(input_dim=self.s_dim[1],
-                                       output_dim=16,
-                                       adj=adj,
-                                       act=tf.nn.relu)(features)
+            hidden1 = GCNLayer(output_dim=32)((adj, features))
 
-            hidden2 = GraphConvolution(input_dim=16,
-                                       output_dim=3,
-                                       adj=adj,
-                                       act=lambda x: x)(hidden1)
+            hidden2 = GCNLayer(output_dim=2*self.s_dim[0] + 1)((adj, hidden1))
 
-            outputs = tf.nn.softmax(hidden2)
+            node_1_prob = tf.nn.softmax(hidden2[:self.s_dim[0]])
+            node_2_prob = tf.nn.softmax(hidden2[self.s_dim[0]:2*self.s_dim[0]])
+            node_1 = tf.argmax(node_1_prob)
+            node_2 = tf.argmax(node_2_prob)
+            stop = tf.nn.sigmoid(hidden2[-1])
+            outputs = [node_1, node_2, stop]
             return adj, features, outputs
 
     def train(self, adj, features, acts, act_grad_weights):
