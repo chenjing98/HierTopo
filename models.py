@@ -51,12 +51,10 @@ class ActorNetwork(object):
 
             hidden1 = GCNLayer(output_dim=32)((adj, features))
 
-            hidden2 = GCNLayer(output_dim=2*self.s_dim[0] + 1)((adj, hidden1))
+            hidden2 = GCNLayer(output_dim=self.s_dim[0]*(self.s_dim[0]-1)/2 + 1)((adj, hidden1))
 
-            node_1_prob = tf.nn.softmax(hidden2[:self.s_dim[0]])
-            node_2_prob = tf.nn.softmax(hidden2[self.s_dim[0]:2*self.s_dim[0]])
-            node_1 = tf.argmax(node_1_prob)
-            node_2 = tf.argmax(node_2_prob)
+            edge_prob = tf.nn.softmax(hidden2[:self.s_dim[0]*(self.s_dim[0]-1)/2])
+            edge = tf.argmax(edge_prob)
             stop = tf.nn.sigmoid(hidden2[-1])
             outputs = [node_1, node_2, stop]
             return adj, features, outputs

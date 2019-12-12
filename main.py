@@ -1,16 +1,17 @@
 import networkx as nx
 import tensorflow as tf
-import models
-from layers import GraphConvolution
-import numpy as np
-import TopoEnv 
-import networkx as nx
+import os
 import matplotlib.pyplot as plt
-import edge_graph
-import utils
 import multiprocessing as mp
 import pickle as pk
 import time
+
+from layers import GraphConvolution
+import numpy as np
+import models
+import TopoEnv 
+import edge_graph
+import utils
 from agent import ActorAgent
 from tf_logger import TFLogger
 from param import args
@@ -19,15 +20,10 @@ from average_reward import *
 S_LEN = 7
 A_DIM = 3
 NUM_AGENTS = 1
-NUM_NODES = 8
 ACTOR_LR_RATE = 0.0001
 CRITIC_LR_RATE = 0.001
 TRAIN_SEQ_LEN = 100  # take as a train batch
 MODEL_SAVE_INTERVAL = 100
-
-
-def main():
-    pass
 
 
 def invoke_model(actor_agent, edges, exp):
@@ -41,12 +37,12 @@ def invoke_model(actor_agent, edges, exp):
 def train_agent(agent_id, param_queue, reward_queue, adv_queue, gradient_queue):
     tf.set_random_seed(agent_id)
     env = TopoEnv.TopoEnv()
-    config = tf.ConfigProto(device_count={'GPU': args.worker_num_cpu}, 
-                gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=worker_gpu_fraction))
+    config = tf.ConfigProto(device_count={'GPU': args.worker_num_gpu}, 
+                gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=args.worker_gpu_fraction))
     sess = tf.Session(config=config)
 
-    assert env.edge_graph.number_of_nodes == args.num_nodes * (args.num_nodes - 1) / 2
-    actor_agent = ActorAgent(sess=sess, node_input_dim=env.edge_graph.number_of_nodes, 
+    assert int(env.edges.number_of_nodes()) == int(args.num_nodes * (args.num_nodes - 1) / 2)
+    actor_agent = ActorAgent(sess=sess, node_input_dim=args.node_input_dim, 
                              hid_dims=args.hid_dims, output_dim=args.output_dim,
                              max_depth=args.max_depth)
 
@@ -55,10 +51,9 @@ def train_agent(agent_id, param_queue, reward_queue, adv_queue, gradient_queue):
         actor_agent.set_params(actor_params)
 
         env.seed(seed)
-        env.reset()
 
-        edges = env.edge_graph
-        done = False
+        edges = env.edges
+        stop = False
 
         exp = {'edges': [], 'reward': []}
 
@@ -72,91 +67,8 @@ def train_agent(agent_id, param_queue, reward_queue, adv_queue, gradient_queue):
         batch_adv = adv_queue.get()
         if batch_adv is None:
             continue
-         actor_gradient, loss = compute_actor_gradients(actor_agent, exp, batch_adv, entropy_weight)
-         gradient_queue.put([actor_gradient, loss])
-
-
-        edge_nodes = (num_nodes - 1) * num_nodes / 2 
-        actor = models.ActorNetwork(sess, feature_dim=[edge_nodes, S_LEN], 
-                                    action_dim=[edge_nodes, A_DIM], learning_rate=ACTOR_LR_RATE)
-        critic = models.CriticNetwork(sess, feature_dim=[edge_nodes, S_LEN], 
-                                      learning_rate=CRITIC_LR_RATE)
-
-        summary_ops, summary_vars = models.build_summaries()
-        sess.run(tf.global_variables_initializer())
-        writer = tf.summary.FileWriter('./', sess.graph)
-        saver = tf.train.Saver()
-
-        epoch = 0
-        action = np.append(np.unravel_index(np.argmax(demand), demand.shape), 0)
-
-        adj_batch = [np.zeros((num_nodes, num_nodes))]
-        f_batch = [np.zeros((num_nodes, S_LEN))]
-        a_batch = [action]
-        r_batch = []
-        entropy_record = []
-        actor_gradient_batch = []
-        critic_gradient_batch = []
-
-        edges = env.edge_graph
-        while True:
-
-            adj = np.array(nx.adjacency_matrix(edges).todense())
-            features = edge_graph.get_features(edges)
-            adj_batch.append(adj)
-            f_batch.append(features)
-            r_batch.append(reward)
-
-            # ATTENTION !!! edegs.number_of_nodes != num_nodes !!!
-            action = actor.predict(np.reshape(adj, (1, edges.number_of_nodes, edges.number_of_nodes)), 
-                                   np.reshape(features, (1, edges.number_of_nodes, S_LEN)))
-
-            edges, reward, stop = env.step(action)
-
-            
-            if len(r_batch) > TRAIN_SEQ_LEN or stop:
-                actor_gradient, critic_gradient, td_batch = models.compute_gradients(
-                    adj_batch=np.stack(adj_batch[1:], axis=0),
-                    f_batch=np.stack(f_batch[1:], axis=0),
-                    a_batch=np.stack(a_batch[1:], axis=0),
-                    r_batch=np.vstack(r_batch[1:]),
-                    terminal=stop, actor=actor, critic=critic
-                )
-                td_loss = np.mean(td_batch)
-
-                actor_gradient_batch.append(actor_gradient_batch)
-                critic_gradient_batch.append(critic_gradient)
-
-                summary_str = sess.run(summary_ops, feed_dict={
-                    summary_vars[0]: td_loss,
-                    summary_vars[1]: np.mean(r_batch),
-                    summary_vars[2]: np.mean(entropy_record)
-                })
-
-                writer.add_summary(summary_str, epoch)
-                writer.flush()
-                entropy_record = []
-
-                if len(actor_gradient_batch) >= GRADIENT_BATCH_SIZE:
-                    for i in range(len(actor_gradient_batch)):
-                        actor.apply_gradients(actor_gradient_batch[i])
-                        critic.apply_gradients(critic_gradient_batch[i])
-
-                    actor_gradient_batch = []
-                    critic_gradient_batch = []
-
-                    epoch += 1
-                    if epoch % MODEL_SAVE_INTERVAL == 0:
-                        print(saver.save(sess, './nn_model_ep_' + str(epoch) + '.ckpt'))        
-
-                del adj_batch[:]
-                del f_batch[:]
-                del a_batch[:]
-                del r_batch[:]
-
-            adj_batch.append(adj)
-            f_batch.append(f)
-            a_batch.append(action)
+        actor_gradient, loss = compute_actor_gradients(actor_agent, exp, batch_adv, entropy_weight)
+        gradient_queue.put([actor_gradient, loss])
 
 
 if __name__ == "__main__":
@@ -164,8 +76,10 @@ if __name__ == "__main__":
     tf.set_random_seed(args.seed)
 
     # create result and model folder
-    create_folder_if_not_exists(args.result_folder)
-    create_folder_if_not_exists(args.model_folder)
+    if not os.path.exists(args.result_folder):
+        os.makedirs(args.result_folder)
+    if not os.path.exists(args.model_folder):
+        os.makedirs(args.model_folder)
 
     # initialize communication queues
     params_queues = [mp.Queue(1) for _ in range(args.num_agents)]
@@ -190,7 +104,7 @@ if __name__ == "__main__":
 
     sess = tf.Session()
 
-    actor_agent = ActorAgent(sess=sess, node_input_dim=env.edge_graph.number_of_nodes, 
+    actor_agent = ActorAgent(sess=sess, node_input_dim=args.node_input_dim, 
                              hid_dims=args.hid_dims, output_dim=args.output_dim,
                              max_depth=args.max_depth)
     tf_logger = TFLogger(sess, ['actor_loss', 'entropy',  'value_loss', 'episode_length',
@@ -263,8 +177,7 @@ if __name__ == "__main__":
         t4 = time.time()
         print('worker send back gradients', t4 - t3, 'seconds')
 
-        actor_agent.apply_gradients(
-            aggregate_gradients(actor_gradients), args.lr)
+        actor_agent.apply_gradients(aggregate_gradients(actor_gradients), args.lr)
 
         t5 = time.time()
         print('apply gradient', t5 - t4, 'seconds')

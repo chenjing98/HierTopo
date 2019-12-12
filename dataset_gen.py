@@ -3,7 +3,7 @@ import numpy as np
 
 data_count = 10000
 dataset = []
-num_nodes = 3
+num_nodes = 8
 
 for i in range(data_count):
     demand = np.random.poisson(lam=3.0, size=(num_nodes, num_nodes))

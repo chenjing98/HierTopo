@@ -3,7 +3,10 @@ import tensorflow as tf
 import utils
 import tensorflow.contrib.layers as tl
 import networkx as nx
+
 import edge_graph
+from gcn import GraphCNN
+from param import args
 
 
 # super class of scheduling agnet
@@ -18,7 +21,7 @@ class Agent(object):
 
 class ActorAgent(Agent):
     def __init__(self, sess, node_input_dim, hid_dims, output_dim, max_depth, eps=1e-6, 
-                 act_fn=leaky_relu, optimizer=tf.train.AdamOptimizer, scope='actor_agent'):
+                 act_fn=tf.nn.leaky_relu, optimizer=tf.train.AdamOptimizer, scope='actor_agent'):
 
         Agent.__init__(self)
 
@@ -35,7 +38,7 @@ class ActorAgent(Agent):
         # node_input_dim = 7
         self.node_inputs = tf.placeholder(tf.float32, shape=[None, self.node_input_dim])
 
-        self.gcn = GraphCNN(node_inputs=self.self.node_inputs, node_input_dim=self.node_input_dim,
+        self.gcn = GraphCNN(inputs=self.node_inputs, input_dim=self.node_input_dim,
                             hid_dims=self.hid_dims, output_dim=self.output_dim, 
                             max_depth=self.max_depth, act_fn=self.act_fn, scope=self.scope)
         
@@ -159,17 +162,15 @@ class ActorAgent(Agent):
     
     # node and edge here are referred to the same.
     def predict(self, node_inputs, gcn_mats):
+        print(np.shape(node_inputs), np.shape(gcn_mats))
+        print(np.shape(self.node_inputs), np.shape(self.gcn.adj_mats))
         return self.sess.run([self.edge_act_probs, self.edge_acts, self.stop], feed_dict={
-            i: d for i, d in zip([self.node_inputs] + self.gcn.adj_mats, [node_inputs] + gcn_masks)
+            i: d for i, d in zip([self.node_inputs] + [self.gcn.adj_mats], [node_inputs] + [gcn_mats])
         })
     
     def invoke_model(self, edges):
         # implement this module here for training
         # (to pick up state and action to record)
-        
-        # get message passing path (with cache)
-        # TODO how to get gcn_mats?
-        # The original decima model called the Postman().
 
         # invoke learning model
         node_inputs = edge_graph.get_features(edges)
@@ -177,3 +178,13 @@ class ActorAgent(Agent):
         edge_act_probs, edge_acts, stop = self.predict(node_inputs, gcn_mats)
 
         return edge_acts, edge_act_probs, stop
+
+    def get_params(self):
+        return self.sess.run(self.params)
+
+    def set_params(self, input_params):
+        self.sess.run(self.set_params_op, feed_dict={
+            i: d for i, d in zip(self.input_params, input_params)
+        })
+
+    

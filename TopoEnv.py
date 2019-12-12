@@ -6,6 +6,7 @@ import itertools
 import math
 import edge_graph
 import numpy as np
+import pickle as pk
 
 
 class TopoEnv(gym.Env):
@@ -18,12 +19,15 @@ class TopoEnv(gym.Env):
         self.degree_penalty = 10
         self.max_action = 50
 
-        self.trace_index = np.random.randint(len(dataset))
-        self.demand = dataset[self.trace_index]['demand']
-        self.allowed_degree = dataset[self.trace_index]['allowed_degree']
+        # isolated random number generator
+        self.np_random = np.random.RandomState()
+
+        self.trace_index = np.random.randint(len(self.dataset))
+        self.demand = self.dataset[self.trace_index]['demand']
+        self.allowed_degree = self.dataset[self.trace_index]['allowed_degree']
         self.available_degree = self.allowed_degree
         self.max_node = self.demand.shape[0]
-        self.edge_graph = edge_graph.convert(demand=self.demand, allowed_degree=self.allowed_degree)
+        self.edges = edge_graph.convert(demand=self.demand, allowed_degree=self.allowed_degree)
         self.graph = nx.Graph()
         self.graph.add_nodes_from(range(self.max_node))
         self.counter = 0
@@ -51,20 +55,23 @@ class TopoEnv(gym.Env):
         
         self.counter += 1
         if stop:
-            self.trace_index = np.random.randint(len(dataset))
-            self.demand = dataset[self.trace_index]['demand']
-            self.allowed_degree = dataset[self.trace_index]['allowed_degree']
+            self.trace_index = np.random.randint(len(self.dataset))
+            self.demand = self.dataset[self.trace_index]['demand']
+            self.allowed_degree = self.dataset[self.trace_index]['allowed_degree']
             self.available_degree = self.allowed_degree
             self.max_node = self.demand.shape[0]
-            self.edge_graph = edge_graph.convert(demand=self.demand, allowed_degree=self.allowed_degree)
+            self.edges = edge_graph.convert(demand=self.demand, allowed_degree=self.allowed_degree)
             self.graph = nx.Graph()
             self.graph.add_nodes_from(range(max_node))
             self.counter = 0
 
-        return self.edge_graph, reward, stop
+        return self.edges, reward, stop
         
-    def get_expert(self):
+    def reset(self):
         pass
+
+    def seed(self, seed):
+        self.np_random.seed(seed)
     
     def _cal_step_reward(self):
         last_score = 0
@@ -98,26 +105,26 @@ class TopoEnv(gym.Env):
         else:
             id_matrix = edge_graph.cal_id_matrix(self.max_node)
             self.graph.add_edge(action[0], action[1])
-            self.edge_graph.nodes[id_matrix[action[0]][action[1]]]['feature'][-1] = 1
+            self.edges.nodes[id_matrix[action[0]][action[1]]]['feature'][-1] = 1
 
             # Update available degree
             self.available_degree = self.allowed_degree - self.graph.degree
             for j in range(self.max_node):
                 if j > action[0]:
-                    self.edge_graph.nodes[id_matrix[action[0]][j]]['feature'][3] -= 1
+                    self.edges.nodes[id_matrix[action[0]][j]]['feature'][3] -= 1
                 else:
-                    self.edge_graph.nodes[id_matrix[action[0]][j]]['feature'][4] -= 1
+                    self.edges.nodes[id_matrix[action[0]][j]]['feature'][4] -= 1
 
             for i in range(self.max_node):
                 if i < action[1]:
-                    self.edge_graph.nodes[id_matrix[i][action[1]]]['feature'][3] -= 1
+                    self.edges.nodes[id_matrix[i][action[1]]]['feature'][3] -= 1
                 else:
-                    self.edge_graph.nodes[id_matrix[i][action[1]]]['feature'][4] -= 1 
+                    self.edges.nodes[id_matrix[i][action[1]]]['feature'][4] -= 1 
 
             # consistency check
-            assert self.edge_graph.nodes[0]['feature'][3] == self.available_degree[0]
+            assert self.edges.nodes[0]['feature'][3] == self.available_degree[0]
             for i in range(1, self.max_node):
-                assert self.edge_graph.nodes[i-1]['feature'][4] == self.available_degree[i]
+                assert self.edges.nodes[i-1]['feature'][4] == self.available_degree[i]
 
             return True
 
@@ -126,3 +133,4 @@ class TopoEnv(gym.Env):
             return False
         else:
             return True
+

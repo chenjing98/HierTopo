@@ -83,10 +83,8 @@ parser.add_argument('--canvas_base', type=int, default=-10,
                     help='Canvas color scale bottom (default: -10)')
 
 # -- Learning --
-parser.add_argument('--node_input_dim', type=int, default=5,
-                    help='node input dimensions to graph embedding (default: 5)')
-parser.add_argument('--job_input_dim', type=int, default=3,
-                    help='job input dimensions to graph embedding (default: 3)')
+parser.add_argument('--node_input_dim', type=int, default=7,
+                    help='node input dimensions to graph embedding (default: 7)')
 parser.add_argument('--hid_dims', type=int, default=[16, 8], nargs='+',
                     help='hidden dimensions throughout graph embedding (default: [16, 8])')
 parser.add_argument('--output_dim', type=int, default=8,
@@ -125,7 +123,7 @@ parser.add_argument('--reset_prob_decay', type=float, default=0,
                     help='Decay rate of reset probability (default: 0)')
 parser.add_argument('--reset_prob_min', type=float, default=0,
                     help='Minimum of decay probability (default: 0)')
-parser.add_argument('--num_agents', type=int, default=16,
+parser.add_argument('--num_agents', type=int, default=1,
                     help='Number of parallel agents (default: 16)')
 parser.add_argument('--num_ep', type=int, default=10000000,
                     help='Number of training epochs (default: 10000000)')
@@ -144,4 +142,8 @@ parser.add_argument('--num_saved_models', type=int, default=1000,
 parser.add_argument('--scheduler_type', type=str, default='dynamic_partition',
                     help='type of scheduling algorithm (default: dynamic_partition)')
 
+
+# -- RosaNet parameters --
+parser.add_argument('--num_nodes', type=int, default=8, 
+                    help='Number of nodes in a graph (default: 8)')
 args = parser.parse_args()

@@ -27,7 +27,7 @@ def edge_id(i, j, n):
         tmp = i
         i = j
         j = tmp
-    return i*(n-(i+1)/2) + j-i-1
+    return int(i*(n-(i+1)/2) + j-i-1)
 
 def cal_id_matrix(n):
     id_matrix = np.zeros((n, n))
@@ -41,7 +41,7 @@ def cal_id_matrix(n):
 def get_features(edge_graph):
     features = []
     feature_list = list(edge_graph.nodes.data())
-    for i in range(edge_graph.number_of_nodes):
+    for i in range(edge_graph.number_of_nodes()):
         features.append(feature_list[i][1]['feature'])
     return np.array(features)
 
@@ -50,6 +50,6 @@ def cal_node_id(e_id, num_nodes):
         if (i+1)*(num_nodes-(i+2)/2) - 1 < e_id:
             continue
         for j in range(i+1, num_nodes):
-            if edge_id(i, j) == e_id:
+            if edge_id(i, j, num_nodes) == e_id:
                 return i, j
     return None
