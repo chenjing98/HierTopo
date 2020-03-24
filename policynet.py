@@ -40,7 +40,7 @@ class GnnPolicy(ActorCriticPolicy):
                                                 scale=scale)
 
         # hyperparameters for GNN
-        self.input_dim = 1
+        self.input_dim = 1 # must be
         self.hid_dims = [64,64]
         self.out_dim = 64
 
@@ -89,26 +89,28 @@ class GnnPolicy(ActorCriticPolicy):
         return self.sess.run(self.value_flat, {self.obs_ph: obs})
 
     def _egnn(self, obs):
-        E_adj = obs # adjacent matrix with edge features [N x N]
+         # adjacent matrix with edge features [b,N,N],node feature matrix [b,N,1]
+        E_adj, X = tf.split(obs,[self.num_n,1],axis=-1)
 
-        X = tf.ones([self.num_n, self.input_dim], tf.float32) # node feature matrix [N, ]
-
-        y = tf.matmul(X, self.gnn_weights[0])
+        y = tf.reshape(X,[-1,1])
+        y = tf.matmul(y, self.gnn_weights[0])
         y += self.gnn_bias[0]
-        y = tf.matmul(tf.reshape(E_adj,[-1,self.num_n]), y)
+        y = tf.reshape(y,[-1,self.num_n,self.hid_dims[0]]) # [b,N,d0]
+        y = tf.matmul(E_adj, y)
         y = tf.sigmoid(y)
 
         for l in range(1, len(self.gnn_weights)-1):
+            y = tf.reshape(y,[-1,self.hid_dims[l-1]])
             y = tf.matmul(y, self.gnn_weights[l])
             y += self.gnn_bias[l]
             y = tf.reshape(y, [-1,self.num_n,self.hid_dims[l]])
-            y = tf.matmul(E_adj, y)
+            y = tf.matmul(E_adj, y) # [b,N,dl]
             y = tf.sigmoid(y)
-            y = tf.reshape(y,[-1,self.hid_dims[l]])
         
+        y = tf.reshape(y,[-1,self.hid_dims[-1]])
         y = tf.matmul(y, self.gnn_weights[-1])
         y += self.gnn_bias[-1]
-        y = tf.reshape(y, [-1,self.num_n,self.hid_dims[-1]])
+        y = tf.reshape(y, [-1,self.num_n,self.out_dim])
         y = tf.matmul(E_adj, y)
         y = tf.sigmoid(y)
 
