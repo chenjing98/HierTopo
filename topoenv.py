@@ -27,7 +27,7 @@ class TopoEnv(gym.Env):
         # define action space and observation space
         self.action_space = spaces.Box(low=0.0,high=1.0,shape=(self.max_node+1,)) #node weights & stop sign
         self.observation_space = spaces.Box(
-            low=0.0,high=np.float32(1e6),shape=(self.max_node,self.max_node)) #featured adjacent matrix
+            low=0.0,high=np.float32(1e6),shape=(self.max_node,self.max_node+1)) #featured adjacent matrix & available degrees
 
     def reset(self):
         self.counter = 0
@@ -45,7 +45,8 @@ class TopoEnv(gym.Env):
         self.graph = nx.path_graph(self.max_node)
 
         E_adj = self._graph2mat()
-        return E_adj
+        obs = np.concatenate((E_adj,self.available_degree[:,np.newaxis]),axis=-1)
+        return obs
 
     def step(self, action):
         """
@@ -85,11 +86,12 @@ class TopoEnv(gym.Env):
         print("[Step: {0}][Reward: {1}]".format(self.counter, reward))
         # Update E_adj
         E_adj = self._graph2mat()
+        obs = np.concatenate((E_adj,self.available_degree[:,np.newaxis]),axis=-1)
         self.counter += 1
         if stop:
             self.reset()
 
-        return E_adj, reward, stop, {}
+        return obs, reward, stop, {}
 
     def seed(self, seed):
         self.np_random.seed(seed)
