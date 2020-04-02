@@ -14,8 +14,9 @@ class TopoEnv(gym.Env):
         with open(fpath, 'rb') as f:
             self.dataset = pk.load(f)
 
-        self.connect_penalty = 0.05
-        self.degree_penalty = 0.05
+        self.connect_penalty = 0.1
+        self.degree_penalty = 0.1
+        self.penalty = 0.1
         self.max_action = 50
         self.max_node = n_node
 
@@ -29,11 +30,15 @@ class TopoEnv(gym.Env):
         self.observation_space = spaces.Box(
             low=0.0,high=np.float32(1e6),shape=(self.max_node,self.max_node+1)) #featured adjacent matrix & available degrees
 
-    def reset(self):
+    def reset(self,demand=None,degree=None,provide=False):
         self.counter = 0
         self.trace_index = np.random.randint(len(self.dataset))
-        self.demand = self.dataset[self.trace_index]['demand']
-        self.allowed_degree = self.dataset[self.trace_index]['allowed_degree']
+        if not provide:
+            self.demand = self.dataset[self.trace_index]['demand']
+            self.allowed_degree = self.dataset[self.trace_index]['allowed_degree']
+        else:
+            self.demand = demand
+            self.degree = degree
         assert self.demand.shape[0] == self.demand.shape[1] # of shape [N,N]
         assert self.max_node == self.demand.shape[0], "Expect demand matrices of dimensions {0} but got {1}"\
             .format(self.max_node, self.demand.shape[0])
@@ -51,7 +56,7 @@ class TopoEnv(gym.Env):
     def step(self, action):
         """
         :param action: [weights for nodes..., stop]
-        :return: next_state, reward, done
+        :return: next_state, reward, done, {}
         """
         assert self.action_space.contains(action), "action type {} is invalid.".format(type(action))
         self.last_graph = copy.deepcopy(self.graph)
@@ -61,6 +66,8 @@ class TopoEnv(gym.Env):
 
         node_weights = action[:-1]
         node_weights = node_weights.tolist()
+        
+        """ original design
         # selected node pair
         ind = []
         n1 = node_weights.index(max(node_weights))
@@ -82,8 +89,45 @@ class TopoEnv(gym.Env):
                 reward = self._cal_step_reward()
             else:   # Node degree violation
                 reward = -self.degree_penalty
+        """
         
-        print("[Step: {0}][Reward: {1}]".format(self.counter, reward))
+        n_max = node_weights.index(max(node_weights))
+        n_min = node_weights.index(min(node_weights))
+        node_weights = np.array(node_weights)
+        add_ind = [n_max,n_min]
+
+        # Check if both nodes have available degree
+        if not self._check_degree(n_max):
+            neighbors = [n for n in self.graph.neighbors(n_max)]
+            weight_dif = abs(node_weights[neighbors] - node_weights[n_max])
+            neighbors = np.array(neighbors)
+            n_sim = np.where(weight_dif==np.min(weight_dif))[0].tolist()
+            n_sim = neighbors[n_sim]
+            for v in n_sim:
+                rm_ind = [n_max,v]
+                if self._check_connectivity(rm_ind):
+                    self._remove_edge(rm_ind)
+                    break
+        if not self._check_degree(n_min):
+            neighbors = [n for n in self.graph.neighbors(n_min)]
+            weight_dif = abs(node_weights[neighbors] - node_weights[n_min])
+            neighbors = np.array(neighbors)
+            n_sim = np.where(weight_dif==np.min(weight_dif))[0].tolist()
+            n_sim = neighbors[n_sim]
+            for v in n_sim:
+                rm_ind = [n_min,v]
+                if self._check_connectivity(rm_ind):
+                    self._remove_edge(rm_ind)
+                    break
+
+        if self._check_validity(add_ind):
+            self._add_edge(add_ind)
+            reward = self._cal_step_reward()
+        else:
+            reward = -self.penalty
+
+        print("[Step{0}][Action{1}][Reward{2}]".format(self.counter,add_ind,reward))
+        
         # Update E_adj
         E_adj = self._graph2mat()
         obs = np.concatenate((E_adj,self.available_degree[:,np.newaxis]),axis=-1)
@@ -113,8 +157,10 @@ class TopoEnv(gym.Env):
             last_score += last_path_length * self.demand[s][d]
             cur_score += cur_path_length * self.demand[s][d]
         
-        last_score /= (sum(sum(self.demand)) * math.sqrt(self.max_node))
-        cur_score /= (sum(sum(self.demand)) * math.sqrt(self.max_node))
+        last_score /= (sum(sum(self.demand)))
+        cur_score /= (sum(sum(self.demand)))
+        #last_score /= (sum(sum(self.demand)) * math.sqrt(self.max_node))
+        #cur_score /= (sum(sum(self.demand)) * math.sqrt(self.max_node))
         return last_score - cur_score
 
 
@@ -167,17 +213,29 @@ class TopoEnv(gym.Env):
         else:
             return True
 
+    def _check_degree(self, node):
+        if self.available_degree[node] < 1:
+            return False
+        else:
+            return True
+
     def _check_connectivity(self, action):
         """
         Checking whether all (src, dst) pairs are stilled connected after removing the selected link.
         """
         self.graph.remove_edge(action[0],action[1])
+        """
         connected = True
         srcs, dsts = self.demand.nonzero()
         for i in range(len(srcs)):
             if not nx.has_path(self.graph,srcs[i],dsts[i]):
                 connected = False
                 break
+        """
+        if nx.is_connected(self.graph):
+            connected = True
+        else:
+            connected = False
         self.graph.add_edge(action[0],action[1])
         return connected
 
