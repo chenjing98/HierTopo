@@ -11,7 +11,7 @@ from policynet import GnnPolicy
 
 MODEL_NAME = "ppo4topo"
 TENSORBOARD_LOG_DIR =  'tensorlog_topo'
-TRAINSTEPS = 1000000
+TRAINSTEPS = int(1e8)
 
 def env_fn():
     env = TopoEnv()

@@ -93,10 +93,12 @@ class GnnPolicy(ActorCriticPolicy):
         E_adj, X = tf.split(obs,[self.num_n,1],axis=-1)
 
         y = tf.reshape(X,[-1,1])
+        # TODO:dropout?
         y = tf.matmul(y, self.gnn_weights[0])
         y += self.gnn_bias[0]
         y = tf.reshape(y,[-1,self.num_n,self.hid_dims[0]]) # [b,N,d0]
         y = tf.matmul(E_adj, y)
+        #y = tf.sparse_tensor_dense_matmul(E_adj,y)
         y = tf.sigmoid(y)
 
         for l in range(1, len(self.gnn_weights)-1):
