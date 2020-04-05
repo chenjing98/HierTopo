@@ -90,11 +90,15 @@ class TopoEnv(object):
         # Check if both nodes have available degree
         v1 = add_ind[0]
         v2 = add_ind[1]
+        rm_inds = []
+        cost = 0
         if not self._check_degree(v1):
             neighbors = [n for n in self.graph.neighbors(v1)]
             h_neightbor = [Bmat[v1,n] for n in neighbors]
             v_n = neighbors[h_neightbor.index(min(h_neightbor))]
             rm_ind = [v_n,v1]
+            cost += min(h_neightbor)
+            rm_inds.append(rm_ind)
             if self._check_connectivity(rm_ind):
                 self._remove_edge(rm_ind)
                 print("remove edge ({0},{1}".format(v_n,v1))
@@ -103,12 +107,20 @@ class TopoEnv(object):
             h_neightbor = [Bmat[v2,n] for n in neighbors]
             v_n = neighbors[h_neightbor.index(min(h_neightbor))]
             rm_ind = [v_n,v2]
+            cost += min(h_neightbor)
+            rm_inds.append(rm_ind)
             if self._check_connectivity(rm_ind):
                 self._remove_edge(rm_ind)
                 print("remove edge ({0},{1})".format(v_n,v2))
         if self._check_validity(add_ind):
-            self._add_edge(add_ind)
-            print("add edge ({0},{1})".format(v1,v2))
+            if Bmat[v1,v2] > cost:
+                self._add_edge(add_ind)
+                print("add edge ({0},{1})".format(v1,v2))
+            else:
+                for rm_ind in rm_inds:
+                    self._add_edge(rm_ind)
+                print("totalstep {}".format(self.counter))
+                stop = True
 
         self.counter += 1
         #print("counter:{}".format(self.counter))
