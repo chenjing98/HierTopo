@@ -49,6 +49,7 @@ class TopoEnv(object):
         # Initialize a path graph
         self.graph = nx.path_graph(self.max_node)
 
+        self.prev_action = []
         #E_adj = self._graph2mat()
         #obs = np.concatenate((E_adj,self.available_degree[:,np.newaxis]),axis=-1)
         obs = (self.graph, self.demand)
@@ -90,6 +91,10 @@ class TopoEnv(object):
         # Check if both nodes have available degree
         v1 = add_ind[0]
         v2 = add_ind[1]
+
+        if v1 in self.prev_action and v2 in self.prev_action:
+            stop = True
+            
         rm_inds = []
         cost = 0
         if not self._check_degree(v1):
@@ -125,6 +130,7 @@ class TopoEnv(object):
         self.counter += 1
         #print("counter:{}".format(self.counter))
         obs = (self.graph, self.demand)
+        self.prev_action = [v1,v2]
         if stop:
             self.reset()
 
