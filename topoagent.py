@@ -1,7 +1,7 @@
 import os
 import gym
 
-from stable_baselines.common.policies import MlpPolicy
+#from stable_baselines.common.policies import MlpPolicy
 from stable_baselines.common.vec_env import DummyVecEnv
 from stable_baselines import PPO2
 from stable_baselines.common.env_checker import check_env
