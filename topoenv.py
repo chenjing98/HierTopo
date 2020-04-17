@@ -9,6 +9,8 @@ import numpy as np
 import pickle as pk
 from gym import spaces
 
+from baseline_new.permatch import permatch
+
 class TopoEnv(gym.Env):
 
     def __init__(self, n_node=8, fpath='10M_8_3.0_const3.pk3'):
@@ -29,7 +31,7 @@ class TopoEnv(gym.Env):
         # define action space and observation space
         self.action_space = spaces.Box(low=0.0,high=1.0,shape=(self.max_node**2,)) #node weights & stop sign
         self.observation_space = spaces.Box(
-            low=0.0,high=np.float32(1e6),shape=(self.max_node,self.max_node+1,self.max_node,self.max_node)) #featured adjacent matrix & available degrees
+            low=0.0,high=np.float32(1e6),shape=(self.max_node**2+1,self.max_node,self.max_node)) #featured adjacent matrix & available degrees
 
     def reset(self,demand=None,degree=None,provide=False):
         self.counter = 0
@@ -39,7 +41,7 @@ class TopoEnv(gym.Env):
             self.allowed_degree = self.dataset[self.trace_index]['allowed_degree']
         else:
             self.demand = demand
-            self.degree = degree
+            self.allowed_degree = degree
         assert self.demand.shape[0] == self.demand.shape[1] # of shape [N,N]
         assert self.max_node == self.demand.shape[0], "Expect demand matrices of dimensions {0} but got {1}"\
             .format(self.max_node, self.demand.shape[0])
@@ -48,13 +50,27 @@ class TopoEnv(gym.Env):
         #self.edges = edge_graph.convert(demand=self.demand, allowed_degree=self.allowed_degree)
         
         self.prev_action = []
-        # Initialize a path graph
-        self.graph = nx.path_graph(self.max_node)
+        
+        # Initialize the graph with a baseline
+        self.permatch_baseline = permatch(self.max_node)
+        permatch_adj = self.permatch_baseline.matching(self.demand,self.allowed_degree)
+        permatch_graph = nx.from_numpy_matrix(permatch_adj)
+        if nx.is_connected(permatch_graph):
+            # use weighted matching as baseline
+            self.graph = permatch_graph
+            adj = permatch_adj
+            print("baseline: weighted matching")
+        else:
+            # use path graph as baseline
+            self.graph = nx.path_graph(self.max_node)
+            adj = np.array(nx.adjacency_matrix(self.graph).todense(), np.float32)
+            print("baseline: path graph")
 
         sp_demand = self._demand_matrix_extend()
-        adj = np.array(nx.adjacency_matrix(self.graph).todense(), np.float32)
-        expand_adj = np.tile(adj[np.newaxis, np.newaxis,:,:], (self.max_node,1,1,1))
-        obs = np.concatenate((sp_demand,expand_adj),axis=1)
+        #expand_adj = np.tile(adj[np.newaxis, np.newaxis,:,:], (self.max_node,1,1,1))
+        #enc_adj = self._adj_extend(adj)
+        expand_adj = adj[np.newaxis,:,:]
+        obs = np.concatenate((sp_demand,expand_adj),axis=0)
         return obs
 
     def step(self, action):
@@ -169,7 +185,7 @@ class TopoEnv(gym.Env):
                 rm_ind = [v_n,v1]
                 if self._check_connectivity(rm_ind):
                     self._remove_edge(rm_ind)
-                    print("remove edge ({0},{1}".format(v_n,v1))
+                    print("remove edge ({0},{1})".format(v_n,v1))
             if not self._check_degree(v2):
                 neighbors = [n for n in self.graph.neighbors(v2)]
                 h_neightbor = [Bmat[v2,n] for n in neighbors]
@@ -188,8 +204,12 @@ class TopoEnv(gym.Env):
         print("[Step{0}][Action{1}][Reward{2}]".format(self.counter,add_ind,reward))
         
         sp_demand = self._demand_matrix_extend()
-        expand_adj = np.tile(adj[np.newaxis, np.newaxis,:,:], (self.max_node,1,1,1))
-        obs = np.concatenate((sp_demand,expand_adj),axis=1)
+        #enc_adj = self._adj_extend(adj)
+        expand_adj = adj[np.newaxis,:,:]
+        obs = np.concatenate((sp_demand,expand_adj),axis=0)
+        #expand_adj = np.tile(adj[np.newaxis, np.newaxis,:,:], (self.max_node,1,1,1))
+        #obs = np.concatenate((sp_demand,expand_adj),axis=1)
+
         self.counter += 1
         if stop:
             self.reset()
@@ -326,12 +346,19 @@ class TopoEnv(gym.Env):
     def _demand_matrix_extend(self):
         """Converting demand matrix into N x N x N x N sparse matrix
         """
-        sparse_demand = np.zeros([self.max_node, self.max_node,self.max_node,self.max_node],np.float32)
+        sparse_demand = np.zeros([self.max_node**2,self.max_node,self.max_node],np.float32)
         srcs, dsts = self.demand.nonzero()
         for i in range(len(srcs)):
             s = srcs[i]
             d = dsts[i]
             demand = self.demand[s,d]
-            sparse_demand[s,d,d,:] -= demand
-            sparse_demand[s,d,:,s] += demand
+            sparse_demand[s*self.max_node+d,d,:] -= demand
+            sparse_demand[s*self.max_node+d,:,s] += demand
         return sparse_demand
+
+    def _adj_extend(self, adj):
+        """
+        Encoding available degree into adjacency matrix
+        """
+        deg_diag = np.diag(self.available_degree)
+        return adj + deg_diag
