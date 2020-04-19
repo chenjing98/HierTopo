@@ -29,9 +29,9 @@ class TopoEnv(gym.Env):
         self.reset()
 
         # define action space and observation space
-        self.action_space = spaces.Box(low=0.0,high=1.0,shape=(self.max_node**2,)) #node weights & stop sign
+        self.action_space = spaces.Box(low=0.0,high=1.0,shape=(self.max_node**2,)) #node weights
         self.observation_space = spaces.Box(
-            low=0.0,high=np.float32(1e6),shape=(self.max_node**2+1,self.max_node,self.max_node)) #featured adjacent matrix & available degrees
+            low=0.0,high=np.float32(1e6),shape=(self.max_node**2+1,self.max_node)) #demand matirx & adjacent matrix & available degrees
 
     def reset(self,demand=None,degree=None,provide=False):
         self.counter = 0
@@ -66,11 +66,15 @@ class TopoEnv(gym.Env):
             adj = np.array(nx.adjacency_matrix(self.graph).todense(), np.float32)
             print("baseline: path graph")
 
+        """
         sp_demand = self._demand_matrix_extend()
         #expand_adj = np.tile(adj[np.newaxis, np.newaxis,:,:], (self.max_node,1,1,1))
         #enc_adj = self._adj_extend(adj)
         expand_adj = adj[np.newaxis,:,:]
         obs = np.concatenate((sp_demand,expand_adj),axis=0)
+        """
+        expand_availdeg = self.available_degree[np.newaxis,:]
+        obs = np.concatenate((self.demand,adj,expand_availdeg),axis=0)
         return obs
 
     def step(self, action):
@@ -203,12 +207,16 @@ class TopoEnv(gym.Env):
 
         print("[Step{0}][Action{1}][Reward{2}]".format(self.counter,add_ind,reward))
         
+        """
         sp_demand = self._demand_matrix_extend()
         #enc_adj = self._adj_extend(adj)
         expand_adj = adj[np.newaxis,:,:]
-        obs = np.concatenate((sp_demand,expand_adj),axis=0)
         #expand_adj = np.tile(adj[np.newaxis, np.newaxis,:,:], (self.max_node,1,1,1))
         #obs = np.concatenate((sp_demand,expand_adj),axis=1)
+        obs = np.concatenate((sp_demand,expand_adj),axis=0)
+        """
+        expand_availdeg = self.available_degree[np.newaxis,:]
+        obs = np.concatenate((self.demand,adj,expand_availdeg),axis=0)
 
         self.counter += 1
         if stop:

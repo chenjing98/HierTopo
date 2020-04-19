@@ -79,7 +79,7 @@ class GnnPolicy(ActorCriticPolicy):
                 v_curr = v_tplus1
                 i_curr = i_tplus1
 
-            graph_latent = i_curr
+            graph_latent = v_curr
             #self.gnn_weights, self.gnn_bias = self._para_init()
 
             #graph_latent = self._egnn(self.processed_obs)
