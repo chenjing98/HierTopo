@@ -201,9 +201,8 @@ class TopoEnv(gym.Env):
             if self._check_validity(add_ind):
                 self._add_edge(add_ind)
                 print("add edge ({0},{1})".format(v1,v2))
-                reward = self._cal_step_reward()
-            else:
-                reward = -self.penalty
+
+        reward = 0
 
         print("[Step{0}][Action{1}][Reward{2}]".format(self.counter,add_ind,reward))
         
