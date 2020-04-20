@@ -28,7 +28,7 @@ class model(object):
 
         for aggregator in self.aggregators:
             curr_node_features = self.node_iterations(aggregator,curr_node_features,curr_neigh_features)
-            curr_neigh_features = self.pad_neighbor_features(adj,curr_node_features)
+            curr_neigh_features = self.pad_neighbor_features(adj, curr_node_features)
         
         output_features = self.demands_sumup(curr_node_features)
         return output_features

@@ -62,7 +62,7 @@ class permatch(object):
         while step < n_steps:
             #choose an edge
             e = demand_vec.index(max(demand_vec))
-            if demand_vec[e] <= 0:
+            if max(demand_vec) <= 0:
                 break
             #edge.append(e)
             n = self.edge_to_node(e)
@@ -70,6 +70,7 @@ class permatch(object):
             n2 = n[1]
             if new_graph.has_edge(n1,n2) > 0:
                 # the edge already exists
+                demand_vec[e] = -self.inf
                 continue
             else:
                 if ((allowed_degree[n1] - new_graph.degree(n1)) > 0 

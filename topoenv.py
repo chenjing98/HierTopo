@@ -69,14 +69,14 @@ class TopoEnv(gym.Env):
             degree_inuse = np.array(self.graph.degree)[:,-1]
             self.available_degree = self.allowed_degree - degree_inuse
 
-            if any(self.available_degree) < 0:
+            if any(self.available_degree < 0):
                 self.graph = nx.connected_watts_strogatz_graph(
                 self.max_node,self.init_degree,0,
                 tries=50,seed=self.np_random.randint(10))
 
-                print("==== initial: watts strogatz graph, rewired =======")
+                print("==== initial: watts strogatz graph, non-rewired =======")
             else:
-                print("======= initial: watts strogatz graph , non-rewired =======")
+                print("======= initial: watts strogatz graph , rewired =======")
         except nx.NetworkXError:
             # initialization with path graph
             self.graph = nx.path_graph(self.max_node)
@@ -233,6 +233,7 @@ class TopoEnv(gym.Env):
         #obs = np.concatenate((sp_demand,expand_adj),axis=1)
         obs = np.concatenate((sp_demand,expand_adj),axis=0)
         """
+        adj = np.array(nx.adjacency_matrix(self.graph).todense(), np.float32)
         expand_availdeg = self.available_degree[np.newaxis,:]
         obs = np.concatenate((self.demand,adj,expand_availdeg),axis=0)
 

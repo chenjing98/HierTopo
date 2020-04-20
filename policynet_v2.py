@@ -45,7 +45,7 @@ class GnnPolicy(ActorCriticPolicy):
         self.dims = [4, 64, 64, 32]
 
         self.num_n = 8 # max_node in the environment
-        self.max_degree = 4
+        self.max_degree = 3
 
         if layers is not None:
             warnings.warn("Usage of the `layers` parameter is deprecated! Use net_arch instead "
