@@ -20,9 +20,13 @@ class TopoEnv(gym.Env):
         self.connect_penalty = 0.1
         self.degree_penalty = 0.1
         self.penalty = 0.1
-        self.max_action = 50
+        self.max_action = 1
         self.max_node = n_node
+        self.init_degree = 2
 
+        self.episode_num = 0
+        self.episode_expand = 2000000
+        self.max_horizon = self.max_node ** 2
         # isolated random number generator
         self.np_random = np.random.RandomState()
 
@@ -34,7 +38,9 @@ class TopoEnv(gym.Env):
             low=0.0,high=np.float32(1e6),shape=(self.max_node**2+1,self.max_node)) #demand matirx & adjacent matrix & available degrees
 
     def reset(self,demand=None,degree=None,provide=False):
+        self.adaptive_horizon()
         self.counter = 0
+        self.episode_num += 1
         self.trace_index = np.random.randint(len(self.dataset))
         if not provide:
             self.demand = self.dataset[self.trace_index]['demand']
@@ -51,21 +57,18 @@ class TopoEnv(gym.Env):
         
         self.prev_action = []
         
-        # Initialize the graph with a baseline
         self.permatch_baseline = permatch(self.max_node)
-        permatch_adj = self.permatch_baseline.matching(self.demand,self.allowed_degree)
-        permatch_graph = nx.from_numpy_matrix(permatch_adj)
-        if nx.is_connected(permatch_graph):
-            # use weighted matching as baseline
-            self.graph = permatch_graph
-            adj = permatch_adj
-            print("baseline: weighted matching")
-        else:
-            # use path graph as baseline
+        
+        # Initialize the graph with a stochastic connected graph
+        try:
+            self.graph = nx.connected_watts_strogatz_graph(
+                self.max_node,self.init_degree,tries=50,seed=self.np_random.randint(10))
+            print("======= initial: watts strogatz graph =======")
+        except nx.NetworkXError:
+            # initialization with path graph
             self.graph = nx.path_graph(self.max_node)
-            adj = np.array(nx.adjacency_matrix(self.graph).todense(), np.float32)
-            print("baseline: path graph")
-
+            print("============ initial: path graph =============")
+        adj = np.array(nx.adjacency_matrix(self.graph).todense(), np.float32)
         """
         sp_demand = self._demand_matrix_extend()
         #expand_adj = np.tile(adj[np.newaxis, np.newaxis,:,:], (self.max_node,1,1,1))
@@ -202,7 +205,7 @@ class TopoEnv(gym.Env):
                 self._add_edge(add_ind)
                 print("add edge ({0},{1})".format(v1,v2))
 
-        reward = 0
+        reward = self._cal_reward_against_permatch()
 
         print("[Step{0}][Action{1}][Reward{2}]".format(self.counter,add_ind,reward))
         
@@ -248,6 +251,34 @@ class TopoEnv(gym.Env):
         #last_score /= (sum(sum(self.demand)) * math.sqrt(self.max_node))
         #cur_score /= (sum(sum(self.demand)) * math.sqrt(self.max_node))
         return last_score - cur_score
+
+    def _cal_reward_against_permatch(self):
+        nn_score = 0
+        permatch_score = 0
+        #last_adj = np.array(nx.adjacency_matrix(self.last_graph).todense())
+        #permatch_new_adj = self.permatch_baseline.n_steps_matching(self.demand,last_adj,self.available_degree)
+        permatch_new_graph = self.permatch_baseline.n_steps_matching(
+            self.demand,self.last_graph,self.allowed_degree,1) # single step weighted matching
+
+        for s, d in itertools.product(range(self.max_node), range(self.max_node)):
+            try:
+                permatch_path_length = float(nx.shortest_path_length(permatch_new_graph,source=s,target=d))
+            except nx.exception.NetworkXNoPath:
+                permatch_path_length = float(self.max_node)
+
+            try:
+                nn_path_length = float(nx.shortest_path_length(self.graph,source=s,target=d))
+            except nx.exception.NetworkXNoPath:
+                nn_path_length = float(self.max_node)
+
+            permatch_score += permatch_path_length * self.demand[s][d]
+            nn_score += nn_path_length * self.demand[s][d]
+        
+        permatch_score /= (sum(sum(self.demand)))
+        nn_score /= (sum(sum(self.demand)))
+        #last_score /= (sum(sum(self.demand)) * math.sqrt(self.max_node))
+        #cur_score /= (sum(sum(self.demand)) * math.sqrt(self.max_node))
+        return nn_score - permatch_score
 
 
     def _add_edge(self, action):
@@ -369,3 +400,10 @@ class TopoEnv(gym.Env):
         """
         deg_diag = np.diag(self.available_degree)
         return adj + deg_diag
+
+    def adaptive_horizon(self):
+        if ((self.episode_num != 0)
+            and (self.episode_num % self.episode_expand == 0 )
+            and (self.max_action < self.max_horizon)):
+
+        self.max_action *= 2
