@@ -76,6 +76,8 @@ class TopoEnv(object):
             adj[i,i] = 1
         masked_obj = (adj==0)*obj
         ind_x, ind_y = np.where(masked_obj==np.max(masked_obj))
+        if np.max(masked_obj) <= 0:
+            stop = True
         if len(ind_x) < 1:
             raise ValueError
         elif len(ind_x) > 1:
@@ -94,38 +96,42 @@ class TopoEnv(object):
 
         if v1 in self.prev_action and v2 in self.prev_action:
             stop = True
-            
-        rm_inds = []
-        cost = 0
-        if not self._check_degree(v1):
-            neighbors = [n for n in self.graph.neighbors(v1)]
-            h_neightbor = [Bmat[v1,n] for n in neighbors]
-            v_n = neighbors[h_neightbor.index(min(h_neightbor))]
-            rm_ind = [v_n,v1]
-            cost += min(h_neightbor)
-            rm_inds.append(rm_ind)
-            if self._check_connectivity(rm_ind):
-                self._remove_edge(rm_ind)
-                print("remove edge ({0},{1}".format(v_n,v1))
-        if not self._check_degree(v2):
-            neighbors = [n for n in self.graph.neighbors(v2)]
-            h_neightbor = [Bmat[v2,n] for n in neighbors]
-            v_n = neighbors[h_neightbor.index(min(h_neightbor))]
-            rm_ind = [v_n,v2]
-            cost += min(h_neightbor)
-            rm_inds.append(rm_ind)
-            if self._check_connectivity(rm_ind):
-                self._remove_edge(rm_ind)
-                print("remove edge ({0},{1})".format(v_n,v2))
-        if self._check_validity(add_ind):
-            if Bmat[v1,v2] > cost:
+
+        if not stop:
+            #rm_inds = []
+            #cost = 0
+            if not self._check_degree(v1):
+                neighbors = [n for n in self.graph.neighbors(v1)]
+                h_neightbor = [Bmat[v1,n] for n in neighbors]
+                v_n = neighbors[h_neightbor.index(min(h_neightbor))]
+                rm_ind = [v_n,v1]
+                #cost += min(h_neightbor)
+                #rm_inds.append(rm_ind)
+                if self._check_connectivity(rm_ind):
+                    self._remove_edge(rm_ind)
+                    print("remove edge ({0},{1})".format(v_n,v1))
+            if not self._check_degree(v2):
+                neighbors = [n for n in self.graph.neighbors(v2)]
+                h_neightbor = [Bmat[v2,n] for n in neighbors]
+                v_n = neighbors[h_neightbor.index(min(h_neightbor))]
+                rm_ind = [v_n,v2]
+                #cost += min(h_neightbor)
+                #rm_inds.append(rm_ind)
+                if self._check_connectivity(rm_ind):
+                    self._remove_edge(rm_ind)
+                    print("remove edge ({0},{1})".format(v_n,v2))
+            if self._check_validity(add_ind):
+                """
+                if Bmat[v1,v2] > cost:
+                    self._add_edge(add_ind)
+                    print("add edge ({0},{1})".format(v1,v2))
+                else:
+                    for rm_ind in rm_inds:
+                        self._add_edge(rm_ind)
+                    stop = True
+                """
                 self._add_edge(add_ind)
                 print("add edge ({0},{1})".format(v1,v2))
-            else:
-                for rm_ind in rm_inds:
-                    self._add_edge(rm_ind)
-                print("totalstep {}".format(self.counter))
-                stop = True
 
         self.counter += 1
         #print("counter:{}".format(self.counter))

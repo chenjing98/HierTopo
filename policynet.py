@@ -40,6 +40,10 @@ class GnnPolicy(ActorCriticPolicy):
                                                 scale=scale)
 
         # hyperparameters for GNN
+        self.beta_v = 0.5
+        self.beta_i = 0.5
+        self.depths = 5
+
         self.input_dim = 1 # must be
         self.hid_dims = [64,64]
         self.out_dim = 64
@@ -59,8 +63,26 @@ class GnnPolicy(ActorCriticPolicy):
             net_arch = [dict(vf=layers, pi=layers)]
 
         with tf.variable_scope("gnn", reuse=reuse):
-            self.gnn_weights, self.gnn_bias = self._para_init()
-            graph_latent = self._egnn(self.processed_obs)
+            
+            self._obs_process(self.processed_obs)
+            initial = True
+            #batch_size = tf.shape(self.processed_obs)[0]
+            V0 = tf.zeros([self.num_n,self.num_n**2],dtype=tf.float32)
+            I0 = tf.zeros([self.num_n,self.num_n,self.num_n**2],dtype=tf.float32)
+            v_curr = V0
+            i_curr = I0
+            for _ in range(self.depths):
+                v_tplus1 = self.message_passing_V(v_curr,i_curr,self.adj,reuse_graph_tensor=initial)
+                i_tplus1 = self.message_passing_I(i_curr,self.adj,self.demand,reuse_graph_tensor=initial)
+                if initial:
+                    initial = False
+                v_curr = v_tplus1
+                i_curr = i_tplus1
+
+            graph_latent = v_curr
+            #self.gnn_weights, self.gnn_bias = self._para_init()
+
+            #graph_latent = self._egnn(self.processed_obs)
 
         with tf.variable_scope("model", reuse=reuse):
 
@@ -87,7 +109,113 @@ class GnnPolicy(ActorCriticPolicy):
 
     def value(self, obs, state=None, mask=None):
         return self.sess.run(self.value_flat, {self.obs_ph: obs})
+    
+    def _obs_process(self, obs):
+        self.demand = obs[:,:-1,:,:]
+        self.adj = obs[:,-1,:,:]
 
+    def message_passing_V(self, V_t, I_t, adj, reuse_graph_tensor=False):
+        """Message passing & update for voltages
+        Args:
+            V_t: voltages at timestep t, of size batch_size x N x N x N
+            I_t: currents at timestep t, of size batch_size x N x N x N x N
+            adj: adjacent matrix, of size batch_size x N x N
+            reuse_graph_tensor: a boolean for if it is the 1st time calling this function
+        Returns:
+            V_t+1: voltages at timestep t+1, of size batch_size x N x N x N
+        """
+        batch_size = tf.shape(adj)[0]
+        if reuse_graph_tensor:
+            """
+            self.R = tf.get_variable(name='r',
+                    shape=[self.num_n,self.num_n,self.num_n**2],
+                    dtype=tf.float32,
+                    initializer=tf.glorot_uniform_initializer())
+            """
+            self.w_v1 = tf.get_variable(name='w_v1',
+                    shape=[self.num_n**2,self.num_n**2],
+                    dtype=tf.float32,
+                    initializer=tf.glorot_normal_initializer())
+            self.b_v1 = tf.get_variable(name='b_v1',
+                    shape=[self.num_n**2],
+                    dtype=tf.float32,
+                    initializer=tf.zeros_initializer())
+            self.w_v2 = tf.get_variable(name='w_v2',
+                    shape=[self.num_n**2,self.num_n**2],
+                    dtype=tf.float32,
+                    initializer=tf.glorot_normal_initializer())
+            self.b_v2 = tf.get_variable(name='b_v2',
+                    shape=[self.num_n**2],
+                    dtype=tf.float32,
+                    initializer=tf.zeros_initializer())
+            self.eps_v =tf.get_variable(name="eps_v",
+                    shape=[1,],
+                    dtype=tf.float32,
+                    initializer=tf.zeros_initializer())
+            V_t = tf.tile(tf.expand_dims(V_t,0),[batch_size,1,1])
+            I_t = tf.tile(tf.expand_dims(I_t,0), [batch_size,1,1,1])
+        #delta_v = tf.multiply(self.R, I_t)
+        m_temp = tf.matmul(tf.reshape(tf.transpose(I_t, [0,3,2,1]),[batch_size,self.num_n**3,self.num_n]), adj, transpose_b=True)
+        m_temp = tf.transpose(tf.reshape(m_temp,[batch_size,self.num_n**2,self.num_n,self.num_n]), [0,3,2,1])
+        m_origin = tf.reduce_sum(m_temp,-2) # of size [batch_size, N, N^2]
+        m_sum = (1+self.eps_v)*V_t + m_origin
+        m_v_mlp1 = tf.tanh(tf.matmul(m_sum,
+            tf.tile(tf.expand_dims(self.w_v1,0), [batch_size,1,1]))
+            + tf.tile(tf.expand_dims(tf.expand_dims(self.b_v1,0),0), [batch_size,self.num_n,1]))
+        m_v_mlp2 = tf.tanh(tf.matmul(m_v_mlp1,
+            tf.tile(tf.expand_dims(self.w_v2,0), [batch_size,1,1]))
+            + tf.tile(tf.expand_dims(tf.expand_dims(self.b_v2,0),0), [batch_size,self.num_n,1]))
+        V_tplus1 = m_v_mlp2
+        return V_tplus1
+    
+    def message_passing_I(self, I_t, adj, demand, reuse_graph_tensor=False):
+        """Message passing & update for currents
+        Args:
+            I_t: currents at timestep t, of size batch_size x N x N x N x N
+            adj: adjacent matrix, of size batch_size x N x N
+            demand: traffic demand as constant current source, of size batch_size x N x N x N x N
+            reuse_graph_tensor: a boolean for if it is the 1st time calling this function
+        Returns:
+            I_t+1: currents at timestep t+1, of size batch_size x N x N x N^2
+        """
+        batch_size = tf.shape(adj)[0]
+        if reuse_graph_tensor:
+            self.w_i1 = tf.get_variable(name='w_i1',
+                    shape=[self.num_n**2,self.num_n**2],
+                    dtype=tf.float32,
+                    initializer=tf.glorot_normal_initializer())
+            self.b_i1 = tf.get_variable(name='b_i1',
+                    shape=[self.num_n**2],
+                    dtype=tf.float32,
+                    initializer=tf.zeros_initializer())
+            self.w_i2 = tf.get_variable(name='w_i2',
+                    shape=[self.num_n**2,self.num_n**2],
+                    dtype=tf.float32,
+                    initializer=tf.glorot_normal_initializer())
+            self.b_i2 = tf.get_variable(name='b_i2',
+                    shape=[self.num_n**2],
+                    dtype=tf.float32,
+                    initializer=tf.zeros_initializer())
+            I_t = tf.tile(tf.expand_dims(I_t,0), [batch_size,1,1,1])
+        i_in = tf.matmul(tf.reshape(tf.transpose(I_t, [0,3,2,1]),[batch_size,self.num_n**3,self.num_n]), adj, transpose_b=True)
+        i_in = tf.transpose(tf.reshape(i_in,[batch_size,self.num_n**2,self.num_n,self.num_n]), [0,3,2,1])
+        i_in = tf.tile(tf.reduce_sum(i_in,-2,keep_dims=True),[1,1,self.num_n,1])
+        i_out = tf.matmul(tf.reshape(tf.transpose(I_t, [0,3,1,2]),[batch_size,self.num_n**3,self.num_n]), adj)
+        i_out = tf.transpose(tf.reshape(i_out,[batch_size,self.num_n**2,self.num_n,self.num_n]),[0,2,3,1])
+        i_out = tf.tile(tf.reduce_sum(i_out,-3,keep_dims=True),[1,self.num_n,1,1])
+        i_sum = i_in + i_out + tf.transpose(demand,[0,2,3,1]) # of size [batch_size, N, N, N^2]
+        m_i_mlp1 = tf.tanh(tf.matmul(
+            tf.reshape(i_sum, [batch_size,self.num_n**2,self.num_n**2]),
+            tf.tile(tf.expand_dims(self.w_i1,0), [batch_size,1,1]))
+            + tf.tile(tf.expand_dims(tf.expand_dims(self.b_i1,0),0), [batch_size,self.num_n**2,1]))
+        m_i_mlp2 = tf.tanh(tf.matmul(
+            m_i_mlp1,
+            tf.tile(tf.expand_dims(self.w_i2,0), [batch_size,1,1]))
+            + tf.tile(tf.expand_dims(tf.expand_dims(self.b_i2,0),0), [batch_size,self.num_n**2,1]))
+        I_tplus1 = tf.reshape(m_i_mlp2,[batch_size,self.num_n,self.num_n,self.num_n**2])
+        return I_tplus1
+
+    """
     def _egnn(self, obs):
          # adjacent matrix with edge features [b,N,N],node feature matrix [b,N,1]
         E_adj, X = tf.split(obs,[self.num_n,1],axis=-1)
@@ -119,9 +247,9 @@ class GnnPolicy(ActorCriticPolicy):
         return y
 
     def _para_init(self):
-        """
-        Initializing network parameters.
-        """
+        
+        ## Initializing network parameters.
+        
         weights = []
         bias = []
 
@@ -138,6 +266,7 @@ class GnnPolicy(ActorCriticPolicy):
         bias.append(zeros([self.out_dim]))
 
         return weights, bias
+        """
 
 def glorot(shape, dtype=tf.float32):
     # Xavier Glorot & Yoshua Bengio (AISTATS 2010) initialization (Eqn 16)
