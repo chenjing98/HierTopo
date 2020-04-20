@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from aggregator import TwoMaxLayerPoolingAggregator
+from GNN.aggregator import TwoMaxLayerPoolingAggregator
 
 class model(object):
     def __init__(self, num_n, max_degree, batch_size, dims, dropout=.4, concat=True, **kwargs):
@@ -46,7 +46,7 @@ class model(object):
         """
         batch_size = tf.shape(demand)[0]
         expand_demand = tf.tile(tf.expand_dims(demand, -1),[1,1,1,self.num_n])
-        I = tf.eye(self.num_n,batch_shape=batch_size)
+        I = tf.eye(self.num_n,batch_shape=tf.expand_dims(batch_size,0))
         absrow = tf.tile(tf.expand_dims(I,2),[1,1,self.num_n,1])
         abscol = tf.tile(tf.expand_dims(I,1),[1,self.num_n,1,1])
         out_demand = tf.multiply(expand_demand, absrow)
@@ -68,23 +68,22 @@ class model(object):
         Returns:
             neighbor_features: of size [batch_size x N x N x N x max_degree x dim]
         """
-        deg = tf.reduce_sum(adj,axis=-1)
+        #deg = tf.reduce_sum(adj,axis=-1)
         #batch_size = tf.shape(adj)[0]
         #expand_adj = tf.expand_dims(tf.expand_dims(adj,1),1)
-        batch_no = 0
         batch_neighbor_features_list = []
-        for batch_adj in tf.split(adj,self.batch_size,axis=0):
+        for batch_no in range(self.batch_size):
+            batch_adj = tf.gather(adj,batch_no,axis=0)
             batch_node_features = tf.gather(node_features,batch_no,axis=0) # [N,N,N,dim]
-            batch_no += 1
             single_neighbor_features_list = []
             for v in range(self.num_n):
-                sliced_adj = tf.gather(tf.squeeze(batch_adj,axis=0),v,axis=-2) #[N,]
+                sliced_adj = tf.gather(batch_adj,v,axis=-2) #[N,]
                 neighbor_inds = tf.squeeze(tf.where(sliced_adj>0),axis=-1) # of size [deg,]
                 deg = tf.shape(neighbor_inds)[0]
                 #if tf.shape(neighbor_inds)[0] <= self.max_degree:
                 v_neighbor_feature = tf.gather(batch_node_features,neighbor_inds,axis=-2) # [N,N,deg,dim]
                 pad_deg = tf.expand_dims(tf.expand_dims(self.max_degree - deg,0),0)
-                paddings = tf.pad(pad_deg,tf.constant([2,1],[1,0]))
+                paddings = tf.pad(pad_deg,tf.constant([[2,1],[1,0]]))
                 v_neighbor_feature = tf.expand_dims(tf.pad(v_neighbor_feature,paddings),2) #[N,N,1,max_deg,dim]
                 single_neighbor_features_list.append(v_neighbor_feature)
             single_neighbor_features = tf.expand_dims(tf.concat(single_neighbor_features_list,2),0) #[1,N,N,N,max_deg,dim]
@@ -141,6 +140,6 @@ class model(object):
             node_features: of size [batch_size, N, N, N, output_dim]
         """
         batch_size = tf.shape(node_features)[0]
-        features = tf.reshape(node_features,[batch_size,self.num_n**2, self.num_n, self.dims[-1]])
+        features = tf.reshape(node_features,[batch_size,self.num_n**2, self.num_n, 2*self.dims[-1]])
         features = tf.reduce_sum(features,axis=1)
         return features

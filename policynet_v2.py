@@ -42,14 +42,10 @@ class GnnPolicy(ActorCriticPolicy):
                                                 scale=scale)
 
         # hyperparameters for GNN
-        self.beta_v = 0.5
-        self.beta_i = 0.5
-        self.depths = 5
-
         self.dims = [4, 64, 64, 32]
 
         self.num_n = 8 # max_node in the environment
-        self.max_degree = 3
+        self.max_degree = 4
 
         if layers is not None:
             warnings.warn("Usage of the `layers` parameter is deprecated! Use net_arch instead "
@@ -66,7 +62,7 @@ class GnnPolicy(ActorCriticPolicy):
         with tf.variable_scope("gnn", reuse=reuse):
             
             self._obs_process(self.processed_obs)
-            gnnnet = model(self.num_n,self.max_degree,n_batch,self.dims)
+            gnnnet = model(self.num_n,self.max_degree,16,self.dims) #batch_size equals n_minibatch
             v_final = gnnnet.forward(self.adj,self.demand,self.available_degree)
             graph_latent = v_final
             #self.gnn_weights, self.gnn_bias = self._para_init()

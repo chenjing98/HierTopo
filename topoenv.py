@@ -36,7 +36,7 @@ class TopoEnv(gym.Env):
         # define action space and observation space
         self.action_space = spaces.Box(low=0.0,high=1.0,shape=(self.max_node**2,)) #node weights
         self.observation_space = spaces.Box(
-            low=0.0,high=np.float32(1e6),shape=(self.max_node**2+1,self.max_node)) #demand matirx & adjacent matrix & available degrees
+            low=0.0,high=np.float32(1e6),shape=(self.max_node*2+1,self.max_node)) #demand matirx & adjacent matrix & available degrees
 
     def reset(self,demand=None,degree=None,provide=False):
         self.adaptive_horizon()
@@ -66,11 +66,24 @@ class TopoEnv(gym.Env):
                 self.max_node,self.init_degree,self.rewiring_prob,
                 tries=50,seed=self.np_random.randint(10))
 
-            print("======= initial: watts strogatz graph =======")
+            degree_inuse = np.array(self.graph.degree)[:,-1]
+            self.available_degree = self.allowed_degree - degree_inuse
+
+            if any(self.available_degree) < 0:
+                self.graph = nx.connected_watts_strogatz_graph(
+                self.max_node,self.init_degree,0,
+                tries=50,seed=self.np_random.randint(10))
+
+                print("==== initial: watts strogatz graph, rewired =======")
+            else:
+                print("======= initial: watts strogatz graph , non-rewired =======")
         except nx.NetworkXError:
             # initialization with path graph
             self.graph = nx.path_graph(self.max_node)
             print("============ initial: path graph =============")
+        
+        degree_inuse = np.array(self.graph.degree)[:,-1]
+        self.available_degree = self.allowed_degree - degree_inuse
         adj = np.array(nx.adjacency_matrix(self.graph).todense(), np.float32)
         """
         sp_demand = self._demand_matrix_extend()

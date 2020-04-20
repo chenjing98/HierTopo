@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from tflayers import Layer, Dense, glorot, zeros
+from GNN.tflayers import Layer, Dense, glorot, zeros
 
 class TwoMaxLayerPoolingAggregator(Layer):
     """ Aggregates via pooling over two MLP functions.

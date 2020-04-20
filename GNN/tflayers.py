@@ -77,7 +77,7 @@ class Dense(Layer):
         if sparse_inputs:
             self.num_features_nonzero = placeholders['num_features_nonzero']
 
-        with tf.variable_scope(self.name + '_vars'):
+        with tf.variable_scope(self.name + '_vars', reuse=tf.AUTO_REUSE):
             self.vars['weights'] = tf.get_variable('weights', shape=(input_dim, output_dim),
                                          dtype=tf.float32, 
                                          initializer=tf.contrib.layers.xavier_initializer(),
