@@ -50,7 +50,7 @@ class TwoMaxLayerPoolingAggregator(Layer):
             self.vars['self_weights'] = glorot([input_dim, output_dim],
                                                         name='self_weights')
             if self.bias:
-                self.vars['bias'] = zeros([self.output_dim], name='bias')
+                self.vars['bias'] = zeros([output_dim], name='bias')
 
         self.input_dim = input_dim
         self.output_dim = output_dim

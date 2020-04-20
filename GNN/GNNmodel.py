@@ -20,7 +20,7 @@ class model(object):
         # build aggregators
         self.aggregators = self._aggregate(self.dims)
     
-    def foward(self, adj, demand, available_degrees):
+    def forward(self, adj, demand, available_degrees):
         init_node_features = self.single_node_features(adj, demand, available_degrees)
         init_neigh_features = self.pad_neighbor_features(adj, init_node_features)
         curr_node_features = init_node_features
@@ -69,7 +69,7 @@ class model(object):
             neighbor_features: of size [batch_size x N x N x N x max_degree x dim]
         """
         deg = tf.reduce_sum(adj,axis=-1)
-        batch_size = tf.shape(adj)[0]
+        #batch_size = tf.shape(adj)[0]
         #expand_adj = tf.expand_dims(tf.expand_dims(adj,1),1)
         batch_no = 0
         batch_neighbor_features_list = []

@@ -23,6 +23,7 @@ class TopoEnv(gym.Env):
         self.max_action = 1
         self.max_node = n_node
         self.init_degree = 2
+        self.rewiring_prob = 0.5
 
         self.episode_num = 0
         self.episode_expand = 2000000
@@ -59,10 +60,12 @@ class TopoEnv(gym.Env):
         
         self.permatch_baseline = permatch(self.max_node)
         
-        # Initialize the graph with a stochastic connected graph
         try:
+            # Initialize the graph with a stochastic connected graph
             self.graph = nx.connected_watts_strogatz_graph(
-                self.max_node,self.init_degree,tries=50,seed=self.np_random.randint(10))
+                self.max_node,self.init_degree,self.rewiring_prob,
+                tries=50,seed=self.np_random.randint(10))
+
             print("======= initial: watts strogatz graph =======")
         except nx.NetworkXError:
             # initialization with path graph
@@ -406,4 +409,4 @@ class TopoEnv(gym.Env):
             and (self.episode_num % self.episode_expand == 0 )
             and (self.max_action < self.max_horizon)):
 
-        self.max_action *= 2
+            self.max_action *= 2
