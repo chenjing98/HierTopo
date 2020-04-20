@@ -7,9 +7,9 @@ from stable_baselines import PPO2
 from stable_baselines.common.env_checker import check_env
 
 from topoenv import TopoEnv
-from policynet import GnnPolicy
+from policynet_v2 import GnnPolicy
 
-MODEL_NAME = "ppo4topo"
+MODEL_NAME = "gnn_ppo4topo"
 TENSORBOARD_LOG_DIR =  'tensorlog_topo'
 TRAINSTEPS = int(1e8)
 

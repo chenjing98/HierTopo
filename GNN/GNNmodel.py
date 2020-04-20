@@ -3,7 +3,7 @@ import tensorflow as tf
 from aggregator import TwoMaxLayerPoolingAggregator
 
 class model(object):
-    def __init__(self, num_n, max_degree, batch_size, dims, learning_rate, dropout, concat=True, **kwargs):
+    def __init__(self, num_n, max_degree, batch_size, dims, dropout=.4, concat=True, **kwargs):
         self.num_n = num_n
         self.max_degree = max_degree
         self.aggregator_cls = TwoMaxLayerPoolingAggregator
@@ -12,9 +12,7 @@ class model(object):
         self.concat = concat
         self.batch_size = batch_size
         
-        self.learning_rate = learning_rate
         self.dropout = dropout
-        self.optimizer = tf.train.AdamOptimizer(self.learning_rate)
 
         self._build()
 
@@ -35,7 +33,6 @@ class model(object):
         output_features = self.demands_sumup(curr_node_features)
         return output_features
         
-
     def single_node_features(self, adj, demand, available_degrees):
         """Abstracting node features.
         
@@ -104,6 +101,9 @@ class model(object):
             if layer == len(dims) - 2:
                 aggregator = self.aggregator_cls(dim_mult*dims[layer], dims[layer+1], act=lambda x : x,
                         dropout=self.dropout, concat=self.concat)
+            elif layer==0:
+                aggregator = self.aggregator_cls(dim_mult*dims[layer], dims[layer+1],
+                        dropout=0.0, concat=self.concat)
             else:
                 aggregator = self.aggregator_cls(dim_mult*dims[layer], dims[layer+1],
                         dropout=self.dropout, concat=self.concat)
