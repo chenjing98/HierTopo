@@ -22,13 +22,12 @@ class model(object):
     
     def forward(self, adj, demand, available_degrees):
         init_node_features = self.single_node_features(adj, demand, available_degrees)
-        init_neigh_features = self.pad_neighbor_features(adj, init_node_features)
-        curr_node_features = init_node_features
-        curr_neigh_features = init_neigh_features
+        prev_node_features = init_node_features
 
         for aggregator in self.aggregators:
-            curr_node_features = self.node_iterations(aggregator,curr_node_features,curr_neigh_features)
-            curr_neigh_features = self.pad_neighbor_features(adj, curr_node_features)
+            prev_neigh_features = self.pad_neighbor_features(adj, prev_node_features)
+            curr_node_features = self.node_iterations(aggregator,prev_node_features,prev_neigh_features)
+            prev_node_features = curr_node_features
         
         output_features = self.demands_sumup(curr_node_features)
         return output_features
@@ -37,21 +36,24 @@ class model(object):
         """Abstracting node features.
         
         Args:
-            adj: Adjacency matrix of size [batch_size x N x N]
-            demand: demand matrix of size [batch_size x N x N]
-            available_degrees: vector for available degrees of size [batch_size x N]
+            adj: Adjacency matrix of size [batch_size, N, N]
+            demand: demand matrix of size [batch_size, N, N]
+            available_degrees: vector for available degrees of size [batch_size, N]
+
         Returns:
-            node_features: [batch_size x N x N x N x dim], 
-                            dim=4,including available degrees, current degrees, out_demand, in_demand
+            node_features: [batch_size, N, N, N, dim], 
+                dim=4,including available degrees, current degrees, out_demand, in_demand
         """
-        batch_size = tf.shape(demand)[0]
+
+        batch_size = self.batch_size
+        #batch_size = tf.shape(demand)[0]
         expand_demand = tf.tile(tf.expand_dims(demand, -1),[1,1,1,self.num_n])
         I = tf.eye(self.num_n,batch_shape=tf.expand_dims(batch_size,0))
         absrow = tf.tile(tf.expand_dims(I,2),[1,1,self.num_n,1])
         abscol = tf.tile(tf.expand_dims(I,1),[1,self.num_n,1,1])
         out_demand = tf.multiply(expand_demand, absrow)
         in_demand = tf.multiply(expand_demand,abscol)
-        expand_avail_degree = tf.tile(tf.expand_dims(tf.expand_dims(available_degrees,1),1),[1,self.num_n,self.num_n,1])
+        expand_avail_degree = tf.tile(tf.expand_dims(available_degrees,1),[1,self.num_n,self.num_n,1])
         current_degrees = tf.reduce_sum(adj,axis=-1)
         expand_curr_degree = tf.tile(tf.expand_dims(tf.expand_dims(current_degrees,1),1),[1,self.num_n,self.num_n,1])
         features = [tf.expand_dims(expand_avail_degree,-1),tf.expand_dims(expand_curr_degree,-1),\
@@ -64,17 +66,22 @@ class model(object):
         Assume that all degrees <= max_degree.
         
         Args:
-            adj: Adjacency matrix of size [batch_size x N x N]
+            adj: Adjacency matrix of size [batch_size, N, N]
+            node_features: of size [batch_size, N, N, N, dim]
+
         Returns:
-            neighbor_features: of size [batch_size x N x N x N x max_degree x dim]
+            neighbor_features: of size [batch_size, N, N, N, max_degree, dim]
         """
+
         #deg = tf.reduce_sum(adj,axis=-1)
         #batch_size = tf.shape(adj)[0]
         #expand_adj = tf.expand_dims(tf.expand_dims(adj,1),1)
+        dim = tf.shape(node_features)[-1]
         batch_neighbor_features_list = []
         for batch_no in range(self.batch_size):
             batch_adj = tf.gather(adj,batch_no,axis=0)
             batch_node_features = tf.gather(node_features,batch_no,axis=0) # [N,N,N,dim]
+            """
             single_neighbor_features_list = []
             for v in range(self.num_n):
                 sliced_adj = tf.gather(batch_adj,v,axis=-2) #[N,]
@@ -87,7 +94,19 @@ class model(object):
                 v_neighbor_feature = tf.expand_dims(tf.pad(v_neighbor_feature,paddings),2) #[N,N,1,max_deg,dim]
                 single_neighbor_features_list.append(v_neighbor_feature)
             single_neighbor_features = tf.expand_dims(tf.concat(single_neighbor_features_list,2),0) #[1,N,N,N,max_deg,dim]
-            batch_neighbor_features_list.append(single_neighbor_features)
+            """
+            nfeatures = tf.tile(tf.expand_dims(batch_node_features,3),[1,1,1,self.num_n,1]) #[N,N,N,N,dim]
+            zeros = tf.zeros_like(
+                tf.tile(tf.expand_dims(batch_node_features,3),[1,1,1,self.max_degree,1]),
+                tf.float32) # [N,N,N,max_degree,dim]
+            expanded_nfeatures = tf.transpose(tf.concat([nfeatures,zeros],axis=-2),[2,3,0,1,4]) # [N,N+max_degree,N,N,dim]
+            expanded_adj = self.expand_deg_adj(batch_adj) # [N, N+max_degree]
+            neighbor_inds = tf.where(expanded_adj)
+            neighbor_features = tf.gather_nd(expanded_nfeatures,neighbor_inds) # [N*max_degree,N,N,dim]
+            neighbor_features = tf.transpose(
+                tf.reshape(neighbor_features,[self.num_n,self.max_degree,self.num_n,self.num_n,dim]),
+                [2,3,0,1,4]) # [N,N,N,max_degree,dim]
+            batch_neighbor_features_list.append(tf.expand_dims(neighbor_features,0))
         batch_neighbor_features = tf.concat(batch_neighbor_features_list,0)
         return batch_neighbor_features
 
@@ -116,8 +135,9 @@ class model(object):
             features_tminus1: of size [batch_size, N, N, N, dim_in]
             neighbor_features_tminus1: of size [batch_size, N, N, N, max_degree, dim_in]
         """
-        batch_size = tf.shape(features_tminus1)[0]
-        dim_in =tf.shape(features_tminus1)[-1]
+        #batch_size = tf.shape(features_tminus1)[0]
+        batch_size = self.batch_size
+        dim_in = aggregator.input_dim
         self_features = tf.reshape(features_tminus1,\
             [batch_size*self.num_n*self.num_n,self.num_n,dim_in])
         neigh_features = tf.reshape(neighbor_features_tminus1,\
@@ -143,3 +163,26 @@ class model(object):
         features = tf.reshape(node_features,[batch_size,self.num_n**2, self.num_n, 2*self.dims[-1]])
         features = tf.reduce_sum(features,axis=1)
         return features
+    
+    def expand_deg_adj(self,adj):
+        """
+        Args:
+            adj: adjacency matrix [N,N]
+        
+        Returns:
+            expanded_adj: [N, N + max_degree], 
+                each line has max_degree of 1s, 
+                [:,:N] is exactly the input adj
+        """
+        deg_inuse = tf.reduce_sum(adj,axis=-1) # [N,]
+        deg_pad = self.max_degree - deg_inuse # [N, ]
+        pad_cols = []
+        ones = tf.ones((self.num_n,self.max_degree),tf.float32)
+        zeros = tf.zeros((self.num_n,self.max_degree),tf.float32)
+        for i in range(self.max_degree):
+            col_i = tf.expand_dims((deg_pad > i),-1)
+            pad_cols.append(col_i)
+        pad_pos = tf.concat(pad_cols,-1)
+        paddings = tf.where(pad_pos,ones,zeros)
+        padded_adj = tf.concat([adj,paddings],axis=-1)
+        return padded_adj

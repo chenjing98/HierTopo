@@ -42,7 +42,7 @@ class GnnPolicy(ActorCriticPolicy):
                                                 scale=scale)
 
         # hyperparameters for GNN
-        self.dims = [4, 64, 64, 32]
+        self.dims = [4, 8, 8, 2]
 
         self.num_n = 8 # max_node in the environment
         self.max_degree = 3
@@ -62,7 +62,7 @@ class GnnPolicy(ActorCriticPolicy):
         with tf.variable_scope("gnn", reuse=reuse):
             
             self._obs_process(self.processed_obs)
-            gnnnet = model(self.num_n,self.max_degree,16,self.dims) #batch_size equals n_minibatch
+            gnnnet = model(self.num_n,self.max_degree,1,self.dims) #batch_size equals n_minibatch
             v_final = gnnnet.forward(self.adj,self.demand,self.available_degree)
             graph_latent = v_final
             #self.gnn_weights, self.gnn_bias = self._para_init()
@@ -99,9 +99,7 @@ class GnnPolicy(ActorCriticPolicy):
         """
         @params: obs: [batch_size, 2N+1, N], including demand matrix, adjacency matrix, and available degree vector
         """
-        self.demand = obs[:,:self.num_n,:]
-        self.adj = obs[:,self.num_n:2*self.num_n,:]
-        self.available_degree = obs[:,-1,:]
+        self.demand, self.adj, self.available_degree = tf.split(obs,[self.num_n,self.num_n,1],axis=1)
 
 def mlp_extractor(flat_observations, net_arch, act_fun):
     """

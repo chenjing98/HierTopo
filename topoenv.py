@@ -34,7 +34,7 @@ class TopoEnv(gym.Env):
         self.reset()
 
         # define action space and observation space
-        self.action_space = spaces.Box(low=0.0,high=1.0,shape=(self.max_node**2,)) #node weights
+        self.action_space = spaces.Box(low=0.0,high=1.0,shape=(self.max_node,)) #node weights
         self.observation_space = spaces.Box(
             low=0.0,high=np.float32(1e6),shape=(self.max_node*2+1,self.max_node)) #demand matirx & adjacent matrix & available degrees
 
@@ -171,7 +171,13 @@ class TopoEnv(gym.Env):
             reward = -self.penalty
         """
 
-        Bmat = action.reshape((self.max_node,self.max_node))
+        #Bmat = action.reshape((self.max_node,self.max_node))
+        Bmat = np.zeros((self.max_node,self.max_node),np.float32)
+        for i in range(self.max_node):
+            for j in range(i+1,self.max_node):
+                deltav = np.abs(action[i]-action[j])
+                Bmat[i,j] = deltav
+                Bmat[j,i] = deltav
         self._graph2Pvec(Bmat)
         obj = Bmat - np.tile(self.Pvec,(self.max_node,1)) - np.tile(self.Pvec.reshape(self.max_node,1),(1,self.max_node))
         adj = np.array(nx.adjacency_matrix(self.graph).todense(), np.float32)

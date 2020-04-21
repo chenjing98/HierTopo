@@ -23,12 +23,12 @@ def main():
         os.makedirs(TENSORBOARD_LOG_DIR)
 
     env_fns = []
-    for _ in range(16):
+    for _ in range(1):
         env_fns.append(env_fn)
 
     vec_env = DummyVecEnv(env_fns)
 
-    model = PPO2(GnnPolicy, vec_env, n_steps=512, verbose=1, tensorboard_log=TENSORBOARD_LOG_DIR)
+    model = PPO2(GnnPolicy, vec_env, n_steps=4, verbose=1, tensorboard_log=TENSORBOARD_LOG_DIR)
 
     print("Model built.")
     model.learn(total_timesteps=TRAINSTEPS)
