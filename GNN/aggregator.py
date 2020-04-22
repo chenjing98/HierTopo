@@ -5,7 +5,7 @@ from GNN.tflayers import Layer, Dense, glorot, zeros
 class TwoMaxLayerPoolingAggregator(Layer):
     """ Aggregates via pooling over two MLP functions.
     """
-    def __init__(self, input_dim, output_dim, model_size="small", neigh_input_dim=None,
+    def __init__(self, input_dim, output_dim, max_degree, model_size="small", neigh_input_dim=None,
             dropout=0., bias=False, act=tf.nn.relu, name=None, concat=True, **kwargs):
         super(TwoMaxLayerPoolingAggregator, self).__init__(**kwargs)
 
@@ -22,6 +22,8 @@ class TwoMaxLayerPoolingAggregator(Layer):
         else:
             name = ''
 
+        self.max_degree = max_degree
+
         if model_size == "small":
             hidden_dim_1 = self.hidden_dim_1 = 512
             hidden_dim_2 = self.hidden_dim_2 = 256
@@ -30,7 +32,7 @@ class TwoMaxLayerPoolingAggregator(Layer):
             hidden_dim_2 = self.hidden_dim_2 = 512
 
         self.mlp_layers = []
-        self.mlp_layers.append(Dense(input_dim=neigh_input_dim,
+        self.mlp_layers.append(Dense(input_dim=self.max_degree*neigh_input_dim,
                                  output_dim=hidden_dim_1,
                                  act=tf.nn.relu,
                                  dropout=dropout,
@@ -65,14 +67,15 @@ class TwoMaxLayerPoolingAggregator(Layer):
 
         dims = tf.shape(neigh_h)
         batch_size = dims[0]
-        num_neighbors = dims[1]
-        # [nodes * sampled neighbors] x [hidden_dim]
-        h_reshaped = tf.reshape(neigh_h, (batch_size * num_neighbors, self.neigh_input_dim))
+        num_neighbors = self.max_degree
+        # [batch_size, num_neighbors x hidden_dim]
+        h_reshaped = tf.reshape(neigh_h, (batch_size, num_neighbors * self.neigh_input_dim))
 
         for l in self.mlp_layers:
             h_reshaped = l(h_reshaped)
-        neigh_h = tf.reshape(h_reshaped, (batch_size, num_neighbors, self.hidden_dim_2))
-        neigh_h = tf.reduce_max(neigh_h, axis=1)
+        #neigh_h = tf.reshape(h_reshaped, (batch_size, num_neighbors, self.hidden_dim_2))
+        #neigh_h = tf.reduce_max(neigh_h, axis=1)
+        neigh_h = h_reshaped # [batch_size, self.hidden_dim_2]
         
         from_neighs = tf.matmul(neigh_h, self.vars['neigh_weights'])
         from_self = tf.matmul(self_vecs, self.vars["self_weights"])

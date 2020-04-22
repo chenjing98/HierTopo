@@ -38,7 +38,7 @@ class model(object):
         Args:
             adj: Adjacency matrix of size [batch_size, N, N]
             demand: demand matrix of size [batch_size, N, N]
-            available_degrees: vector for available degrees of size [batch_size, N]
+            available_degrees: vector for available degrees of size [batch_size, 1, N]
 
         Returns:
             node_features: [batch_size, N, N, N, dim], 
@@ -52,7 +52,7 @@ class model(object):
         absrow = tf.tile(tf.expand_dims(I,2),[1,1,self.num_n,1])
         abscol = tf.tile(tf.expand_dims(I,1),[1,self.num_n,1,1])
         out_demand = tf.multiply(expand_demand, absrow)
-        in_demand = tf.multiply(expand_demand,abscol)
+        in_demand = tf.multiply(expand_demand, abscol)
         expand_avail_degree = tf.tile(tf.expand_dims(available_degrees,1),[1,self.num_n,self.num_n,1])
         current_degrees = tf.reduce_sum(adj,axis=-1)
         expand_curr_degree = tf.tile(tf.expand_dims(tf.expand_dims(current_degrees,1),1),[1,self.num_n,self.num_n,1])
@@ -117,13 +117,13 @@ class model(object):
             dim_mult = 2 if self.concat and (layer != 0) else 1
             # aggregator at current layer
             if layer == len(dims) - 2:
-                aggregator = self.aggregator_cls(dim_mult*dims[layer], dims[layer+1], act=lambda x : x,
-                        dropout=self.dropout, concat=self.concat)
+                aggregator = self.aggregator_cls(dim_mult*dims[layer], dims[layer+1], self.max_degree,
+                        act=lambda x : x, dropout=self.dropout, concat=self.concat)
             elif layer==0:
-                aggregator = self.aggregator_cls(dim_mult*dims[layer], dims[layer+1],
+                aggregator = self.aggregator_cls(dim_mult*dims[layer], dims[layer+1], self.max_degree,
                         dropout=0.0, concat=self.concat)
             else:
-                aggregator = self.aggregator_cls(dim_mult*dims[layer], dims[layer+1],
+                aggregator = self.aggregator_cls(dim_mult*dims[layer], dims[layer+1], self.max_degree,
                         dropout=self.dropout, concat=self.concat)
             aggregators.append(aggregator)
             

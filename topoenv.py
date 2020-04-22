@@ -26,7 +26,7 @@ class TopoEnv(gym.Env):
         self.rewiring_prob = 0.5
 
         self.episode_num = 0
-        self.episode_expand = 2000000
+        self.episode_expand = 100000
         self.max_horizon = self.max_node ** 2
         # isolated random number generator
         self.np_random = np.random.RandomState()
@@ -82,6 +82,7 @@ class TopoEnv(gym.Env):
             self.graph = nx.path_graph(self.max_node)
             print("============ initial: path graph =============")
         
+        self.last_graph = copy.deepcopy(self.graph)
         degree_inuse = np.array(self.graph.degree)[:,-1]
         self.available_degree = self.allowed_degree - degree_inuse
         adj = np.array(nx.adjacency_matrix(self.graph).todense(), np.float32)
@@ -102,7 +103,6 @@ class TopoEnv(gym.Env):
         :return: next_state, reward, done, {}
         """
         assert self.action_space.contains(action), "action type {} is invalid.".format(type(action))
-        self.last_graph = copy.deepcopy(self.graph)
 
         """ original design
         # selected node pair
@@ -197,40 +197,37 @@ class TopoEnv(gym.Env):
         v1 = add_ind[0]
         v2 = add_ind[1]
 
-        stop = self.counter >= self.max_action
+        stop = self.counter >= (self.max_action - 1)
 
-        if np.max(masked_obj) <= 0:
-            stop = True
+        #if np.max(masked_obj) <= 0:
+        #    stop = True
 
-        if v1 in self.prev_action and v2 in self.prev_action:
-            stop = True
+        #if v1 in self.prev_action and v2 in self.prev_action:
+        #    stop = True
+
+        if not self._check_degree(v1):
+            neighbors = [n for n in self.graph.neighbors(v1)]
+            h_neightbor = [Bmat[v1,n] for n in neighbors]
+            v_n = neighbors[h_neightbor.index(min(h_neightbor))]
+            rm_ind = [v_n,v1]
+            if self._check_connectivity(rm_ind):
+                self._remove_edge(rm_ind)
+                print("remove edge ({0},{1})".format(v_n,v1))
+        if not self._check_degree(v2):
+            neighbors = [n for n in self.graph.neighbors(v2)]
+            h_neightbor = [Bmat[v2,n] for n in neighbors]
+            v_n = neighbors[h_neightbor.index(min(h_neightbor))]
+            rm_ind = [v_n,v2]
+            if self._check_connectivity(rm_ind):
+                self._remove_edge(rm_ind)
+                print("remove edge ({0},{1})".format(v_n,v2))
+        if self._check_validity(add_ind):
+            self._add_edge(add_ind)
+            print("add edge ({0},{1})".format(v1,v2))
 
         reward = 0
-        if not stop:
-            if not self._check_degree(v1):
-                neighbors = [n for n in self.graph.neighbors(v1)]
-                h_neightbor = [Bmat[v1,n] for n in neighbors]
-                v_n = neighbors[h_neightbor.index(min(h_neightbor))]
-                rm_ind = [v_n,v1]
-                if self._check_connectivity(rm_ind):
-                    self._remove_edge(rm_ind)
-                    print("remove edge ({0},{1})".format(v_n,v1))
-            if not self._check_degree(v2):
-                neighbors = [n for n in self.graph.neighbors(v2)]
-                h_neightbor = [Bmat[v2,n] for n in neighbors]
-                v_n = neighbors[h_neightbor.index(min(h_neightbor))]
-                rm_ind = [v_n,v2]
-                if self._check_connectivity(rm_ind):
-                    self._remove_edge(rm_ind)
-                    print("remove edge ({0},{1})".format(v_n,v2))
-            if self._check_validity(add_ind):
-                self._add_edge(add_ind)
-                print("add edge ({0},{1})".format(v1,v2))
+        self.last_graph = copy.deepcopy(self.graph)
 
-        reward = self._cal_reward_against_permatch()
-
-        print("[Step{0}][Action{1}][Reward{2}]".format(self.counter,add_ind,reward))
-        
         """
         sp_demand = self._demand_matrix_extend()
         #enc_adj = self._adj_extend(adj)
@@ -245,8 +242,11 @@ class TopoEnv(gym.Env):
 
         self.counter += 1
         if stop:
+            reward = self._cal_reward_against_permatch()
             self.reset()
 
+        print("[Step {0}][Action {1}][Reward {2}]".format(self.counter,add_ind,reward))
+        
         return obs, reward, stop, {}
 
     def seed(self, seed):
@@ -281,7 +281,7 @@ class TopoEnv(gym.Env):
         #last_adj = np.array(nx.adjacency_matrix(self.last_graph).todense())
         #permatch_new_adj = self.permatch_baseline.n_steps_matching(self.demand,last_adj,self.available_degree)
         permatch_new_graph = self.permatch_baseline.n_steps_matching(
-            self.demand,self.last_graph,self.allowed_degree,1) # single step weighted matching
+            self.demand,self.last_graph,self.allowed_degree,self.max_action) # weighted matching
 
         for s, d in itertools.product(range(self.max_node), range(self.max_node)):
             try:
@@ -301,7 +301,7 @@ class TopoEnv(gym.Env):
         nn_score /= (sum(sum(self.demand)))
         #last_score /= (sum(sum(self.demand)) * math.sqrt(self.max_node))
         #cur_score /= (sum(sum(self.demand)) * math.sqrt(self.max_node))
-        return nn_score - permatch_score
+        return permatch_score - nn_score
 
 
     def _add_edge(self, action):

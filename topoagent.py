@@ -11,7 +11,7 @@ from policynet_v2 import GnnPolicy
 
 MODEL_NAME = "gnn_ppo4topo"
 TENSORBOARD_LOG_DIR =  'tensorlog_topo'
-TRAINSTEPS = int(1e8)
+TRAINSTEPS = 1000000
 
 def env_fn():
     env = TopoEnv()
@@ -23,7 +23,7 @@ def main():
         os.makedirs(TENSORBOARD_LOG_DIR)
 
     env_fns = []
-    for _ in range(1):
+    for _ in range(32):
         env_fns.append(env_fn)
 
     vec_env = DummyVecEnv(env_fns)
