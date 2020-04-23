@@ -13,9 +13,11 @@ from baseline_new.permatch import permatch
 
 class TopoEnv(gym.Env):
 
-    def __init__(self, n_node=8, fpath='10M_8_3.0_const3.pk3'):
-        with open(fpath, 'rb') as f:
-            self.dataset = pk.load(f)
+    def __init__(self, n_node=8, fpath='10M_8_3.0_const3.pk3',fpath_topo='10M_8_3.0_const3_topo.pk3'):
+        with open(fpath, 'rb') as f1:
+            self.dataset = pk.load(f1)
+        with open(fpath_topo, 'rb') as f2:
+            self.topo_dataset = pk.load(f2)
 
         self.connect_penalty = 0.1
         self.degree_penalty = 0.1
@@ -26,7 +28,7 @@ class TopoEnv(gym.Env):
         self.rewiring_prob = 0.5
 
         self.episode_num = 0
-        self.episode_expand = 100000
+        self.episode_expand = 500000
         self.max_horizon = self.max_node ** 2
         # isolated random number generator
         self.np_random = np.random.RandomState()
@@ -59,7 +61,12 @@ class TopoEnv(gym.Env):
         self.prev_action = []
         
         self.permatch_baseline = permatch(self.max_node)
-        
+
+        # initialize graph
+        self.topo_index = np.random.randint(len(self.topo_dataset))
+        self.graph_dict = self.topo_dataset[self.topo_index]
+        self.graph = nx.from_dict_of_dicts(self.graph_dict)
+        """
         try:
             # Initialize the graph with a stochastic connected graph
             self.graph = nx.connected_watts_strogatz_graph(
@@ -81,7 +88,8 @@ class TopoEnv(gym.Env):
             # initialization with path graph
             self.graph = nx.path_graph(self.max_node)
             print("============ initial: path graph =============")
-        
+        """
+
         self.last_graph = copy.deepcopy(self.graph)
         degree_inuse = np.array(self.graph.degree)[:,-1]
         self.available_degree = self.allowed_degree - degree_inuse
@@ -205,6 +213,7 @@ class TopoEnv(gym.Env):
         #if v1 in self.prev_action and v2 in self.prev_action:
         #    stop = True
 
+        rm_inds = []
         if not self._check_degree(v1):
             neighbors = [n for n in self.graph.neighbors(v1)]
             h_neightbor = [Bmat[v1,n] for n in neighbors]
@@ -213,6 +222,7 @@ class TopoEnv(gym.Env):
             if self._check_connectivity(rm_ind):
                 self._remove_edge(rm_ind)
                 print("remove edge ({0},{1})".format(v_n,v1))
+                rm_inds.append(rm_ind)
         if not self._check_degree(v2):
             neighbors = [n for n in self.graph.neighbors(v2)]
             h_neightbor = [Bmat[v2,n] for n in neighbors]
@@ -221,9 +231,13 @@ class TopoEnv(gym.Env):
             if self._check_connectivity(rm_ind):
                 self._remove_edge(rm_ind)
                 print("remove edge ({0},{1})".format(v_n,v2))
+                rm_inds.append(rm_ind)
         if self._check_validity(add_ind):
             self._add_edge(add_ind)
             print("add edge ({0},{1})".format(v1,v2))
+        else:
+            for rm_ind in rm_inds:
+                self._add_edge(rm_ind)
 
         reward = 0
         self.last_graph = copy.deepcopy(self.graph)

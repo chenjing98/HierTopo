@@ -9,9 +9,9 @@ from stable_baselines.common.env_checker import check_env
 from topoenv import TopoEnv
 from policynet_v2 import GnnPolicy
 
-MODEL_NAME = "gnn_ppo4topo"
+MODEL_NAME = "gnn_ppo4toposet"
 TENSORBOARD_LOG_DIR =  'tensorlog_topo'
-TRAINSTEPS = 1000000
+TRAINSTEPS = 10000000
 
 def env_fn():
     env = TopoEnv()
