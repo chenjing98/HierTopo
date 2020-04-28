@@ -158,6 +158,9 @@ class model(object):
         """
         Args:
             node_features: of size [batch_size, N, N, N, output_dim]
+        
+        Returns:
+            node features (after suming up for all demands) : of size [batch_size, N, outdim]
         """
         batch_size = tf.shape(node_features)[0]
         features = tf.reshape(node_features,[batch_size,self.num_n**2, self.num_n, 2*self.dims[-1]])

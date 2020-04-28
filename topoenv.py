@@ -22,13 +22,13 @@ class TopoEnv(gym.Env):
         self.connect_penalty = 0.1
         self.degree_penalty = 0.1
         self.penalty = 0.1
-        self.max_action = 1
+        self.max_action = 4
         self.max_node = n_node
         self.init_degree = 2
         self.rewiring_prob = 0.5
 
         self.episode_num = 0
-        self.episode_expand = 500000
+        self.episode_expand = 100000
         self.max_horizon = self.max_node ** 2
         # isolated random number generator
         self.np_random = np.random.RandomState()
@@ -239,8 +239,8 @@ class TopoEnv(gym.Env):
             for rm_ind in rm_inds:
                 self._add_edge(rm_ind)
 
-        reward = 0
-        self.last_graph = copy.deepcopy(self.graph)
+        reward = 0.0
+        #self.last_graph = copy.deepcopy(self.graph)
 
         """
         sp_demand = self._demand_matrix_extend()
@@ -257,9 +257,9 @@ class TopoEnv(gym.Env):
         self.counter += 1
         if stop:
             reward = self._cal_reward_against_permatch()
+            print("[Horizon {0}] [Episode {1}] [Reward {2}]".format(
+                self.max_action, self.episode_num,reward))
             self.reset()
-
-        print("[Step {0}][Action {1}][Reward {2}]".format(self.counter,add_ind,reward))
         
         return obs, reward, stop, {}
 
@@ -440,7 +440,7 @@ class TopoEnv(gym.Env):
 
     def adaptive_horizon(self):
         if ((self.episode_num != 0)
-            and (self.episode_num % self.episode_expand == 0 )
+            and (self.episode_num % self.episode_expand == 0)
             and (self.max_action < self.max_horizon)):
 
             self.max_action *= 2
