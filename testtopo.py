@@ -6,22 +6,24 @@ from baseline_new.permatch import permatch
 from baseline_new.create_file import create_file
 
 import numpy as np
+import itertools
 import tensorflow as tf
 from stable_baselines import PPO2
 from topoenv import TopoEnv
 
 import networkx as nx
+from whatisoptimal import optimal
 #from h_shortest_path import TopoEnv,TopoOperator
 
-MODEL_NAME = "gnn_ppo4topo48"
+MODEL_NAME = "gnn_ppo4topo"
 NUM_NODE = 8
 COUNT = 8 # ?
 ITERS = 1000
 FOLDER = './data/'
 
-def compute_reward(state, node_num, demand, degree,degree_penalty):    
+def compute_reward(state, num_node, demand, degree,degree_penalty):    
     D = copy.deepcopy(state)
-
+    """
     # floyd shortest path algorithm
     for i in range(node_num):
         for j in range(node_num):
@@ -42,11 +44,26 @@ def compute_reward(state, node_num, demand, degree,degree_penalty):
             else:
                 score += demand[i,j]*D[i,j] 
     
+    score /= (sum(sum(demand)))
+    """
+    """
     # degree penalty
     for i in range(node_num):
         if np.sum(state[i,:]) > degree[i]:
-            score = score + degree_penalty            
-    return score 
+            score = score + degree_penalty 
+    """     
+    graph = nx.from_numpy_matrix(D)
+    cost = 0
+    for s, d in itertools.product(range(num_node), range(num_node)):
+        try:
+            path_length = float(nx.shortest_path_length(graph,source=s,target=d))
+        except nx.exception.NetworkXNoPath:
+            path_length = float(num_node)
+
+        cost += path_length * demand[s,d]   
+
+    cost /= (sum(sum(demand)))   
+    return cost 
 
 def main():
     node_num = NUM_NODE
@@ -60,10 +77,12 @@ def main():
     #env = TopoEnv()
     #opr = TopoOperator(node_num)
     env = TopoEnv(node_num)
+    opt = optimal()
 
     scores_ego = []
     scores_match = []
     scores_nn = []
+    scores_o = []
     scores_2m = []
     #scores_h = []
     #steps_h = []
@@ -88,7 +107,7 @@ def main():
 
         # test per-match
         state_m = permatch_model.matching(demand,degree)
-        score_m = compute_reward(state_m, node_num, demand, degree, 50)
+        score_m = compute_reward(state_m, node_num, demand, degree, 100)
         scores_match.append(score_m)
 
         
@@ -97,7 +116,7 @@ def main():
         obs = copy.deepcopy(origin_obs)
         #done = False
         steps = 0
-        for _ in range(8):
+        for _ in range(1):
             obs = np.tile(obs[np.newaxis,:,:],[32,1,1])
             action, _ = policy.predict(obs)
             action = action[0,:]
@@ -106,20 +125,27 @@ def main():
         state_n = obs2adj(obs,node_num)
         print("final state (steps {})".format(steps))
         print(state_n)
-        score_n = compute_reward(state_n, node_num, demand, degree, 50)
+        score_n = compute_reward(state_n, node_num, demand, degree, 100)
         scores_nn.append(score_n)
+
+        adj = origin_obs[node_num:-1,:]
+        origin_graph = nx.from_numpy_matrix(adj)
+        opt_graph = opt.compute_optimal(node_num,origin_graph,demand,degree)
+        state_o = np.array(nx.adjacency_matrix(opt_graph).todense(), np.float32)
+        score_o = compute_reward(state_o, node_num, demand, degree, 100)
+        scores_o.append(score_o)
 
         # 2-step weighted matching for comparison
         adj = origin_obs[node_num:-1,:]
         origin_graph = nx.from_numpy_matrix(adj)
         permatch_new_graph = permatch_model.n_steps_matching(
-            demand,origin_graph,degree,8)
+            demand,origin_graph,degree,1)
         state_2m = np.array(nx.adjacency_matrix(permatch_new_graph).todense(), np.float32)
         score_2m = compute_reward(state_2m, node_num, demand, degree, 50)
         scores_2m.append(score_2m)
 
-        print("[iter {0}][egotree:{1}][permatch:{2}][nn: {3}][2-step permatch: {4}]".
-                format(i_iter,score_e,score_m,score_n,score_2m))
+        print("[iter {0}][egotree:{1}][permatch:{2}][nn: {3}][1-opt: {4}][2-step permatch: {5}]".
+                format(i_iter,score_e,score_m,score_n,score_o,score_2m))
 
         """
         # test h w/o NN
@@ -143,8 +169,8 @@ def main():
         """
     #print("Avg_scores: egotree{0} permatch{1} nn{2}".format(
     #    np.mean(scores_ego),np.mean(scores_match),np.mean(scores_nn)))
-    print("Avg_scores: egotree{0} permatch{1} nn{2} 2match{3}".format(
-        np.mean(scores_ego),np.mean(scores_match),np.mean(scores_nn),np.mean(scores_2m)))
+    print("Avg_scores: egotree{0} permatch{1} nn{2} opt{3} 2match{4}".format(
+        np.mean(scores_ego),np.mean(scores_match),np.mean(scores_nn),np.mean(scores_o),np.mean(scores_2m)))
     #print("Avg_steps_h: {}".format(np.mean(steps_h)))
 
 def obs2adj(obs,node_num):

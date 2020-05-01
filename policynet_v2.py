@@ -14,7 +14,7 @@ from stable_baselines.common.input import observation_input
 from stable_baselines.common.policies import ActorCriticPolicy
 from stable_baselines.common.vec_env import DummyVecEnv
 
-from GNN.GNNmodel import model
+from GNN.GNN_nodeedge import model
 
 class GnnPolicy(ActorCriticPolicy):
     """
@@ -62,7 +62,7 @@ class GnnPolicy(ActorCriticPolicy):
         with tf.variable_scope("gnn", reuse=reuse):
             
             self._obs_process(self.processed_obs)
-            gnnnet = model(self.num_n,self.max_degree,32,self.dims) #batch_size equals n_minibatch
+            gnnnet = model(self.num_n,self.max_degree,32) #batch_size equals n_minibatch
             v_final = gnnnet.forward(self.adj,self.demand,self.available_degree)
             graph_latent = v_final
             #self.gnn_weights, self.gnn_bias = self._para_init()
