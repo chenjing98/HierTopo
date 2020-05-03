@@ -5,13 +5,14 @@ import gym
 from stable_baselines.common.vec_env import DummyVecEnv
 from stable_baselines import PPO2
 from stable_baselines.common.env_checker import check_env
+from stable_baselines.gail.dataset.dataset import ExpertDataset
 
 from topoenv import TopoEnv
 from policynet_v2 import GnnPolicy
 
-MODEL_NAME = "gnnppo4topo1"
+MODEL_NAME = "gnnppo4topo_pretrain"
 TENSORBOARD_LOG_DIR =  'tensorlog_topo'
-TRAINSTEPS = 3200000
+TRAINSTEPS = 320000
 HAS_PRETRAINED = False
 
 def env_fn():
@@ -35,8 +36,9 @@ def main():
         model = PPO2(GnnPolicy, vec_env, gamma=1, n_steps=4, verbose=1, tensorboard_log=TENSORBOARD_LOG_DIR)
 
     print("Model built.")
-    model.learn(total_timesteps=TRAINSTEPS)
-    print("Training terminated.")
+    dataset = ExpertDataset(expert_path="./pretraindata.npz",batch_size=32)
+    model.pretrain(dataset)
+    print("Pretraining terminated.")
 
     # save model
     model.save(MODEL_NAME)

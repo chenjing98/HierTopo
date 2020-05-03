@@ -51,7 +51,7 @@ def remove_extra_edge(allowed_degree, graph):
 
 dataset_size = 0
 i=0
-while i <= data_count-1:
+while i < data_count:
     success, graph = random_topology_generator(num_nodes,allowed_degree)
     if success:
         graph_dict = nx.to_dict_of_dicts(graph)

@@ -36,7 +36,7 @@ class GnnPolicy(ActorCriticPolicy):
     :param kwargs: (dict) Extra keyword arguments for the nature CNN feature extraction
     """
 
-    def __init__(self, sess, ob_space, ac_space, n_env, n_steps, n_batch, reuse=False, layers=None, net_arch=None,
+    def __init__(self, sess, ob_space, ac_space, n_env, n_steps, n_batch, reuse=False, layers=None, net_arch=[dict(vf=[64,64])],
                  act_fun=tf.tanh, scale=False, **kwargs):
         super(GnnPolicy, self).__init__(sess, ob_space, ac_space, n_env, n_steps, n_batch, reuse=reuse,
                                                 scale=scale)
@@ -99,6 +99,7 @@ class GnnPolicy(ActorCriticPolicy):
         """
         @params: obs: [batch_size, 2N+1, N], including demand matrix, adjacency matrix, and available degree vector
         """
+        obs = tf.reshape(obs,[-1,self.num_n*2+1,self.num_n])
         self.demand, self.adj, self.available_degree = tf.split(obs,[self.num_n,self.num_n,1],axis=1)
 
 def mlp_extractor(flat_observations, net_arch, act_fun):

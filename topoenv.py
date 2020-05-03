@@ -22,7 +22,7 @@ class TopoEnv(gym.Env):
         self.connect_penalty = 0.1
         self.degree_penalty = 0.1
         self.penalty = 0.1
-        self.max_action = 4
+        self.max_action = 1
         self.max_node = n_node
         self.init_degree = 2
         self.rewiring_prob = 0.5
@@ -38,7 +38,7 @@ class TopoEnv(gym.Env):
         # define action space and observation space
         self.action_space = spaces.Box(low=0.0,high=1.0,shape=(self.max_node,)) #node weights
         self.observation_space = spaces.Box(
-            low=0.0,high=np.float32(1e6),shape=(self.max_node*2+1,self.max_node)) #demand matirx & adjacent matrix & available degrees
+            low=0.0,high=np.float32(1e6),shape=((self.max_node*2+1)*self.max_node,)) #demand matirx & adjacent matrix & available degrees
 
     def reset(self,demand=None,degree=None,provide=False):
         self.adaptive_horizon()
@@ -102,7 +102,9 @@ class TopoEnv(gym.Env):
         obs = np.concatenate((sp_demand,expand_adj),axis=0)
         """
         expand_availdeg = self.available_degree[np.newaxis,:]
-        obs = np.concatenate((self.demand,adj,expand_availdeg),axis=0)
+        demand_norm = self.demand/(np.max(self.demand)+1e-7)
+        obs = np.concatenate((demand_norm,adj,expand_availdeg),axis=0)
+        obs = obs.flatten()
         return obs
 
     def step(self, action):
@@ -252,8 +254,9 @@ class TopoEnv(gym.Env):
         """
         adj = np.array(nx.adjacency_matrix(self.graph).todense(), np.float32)
         expand_availdeg = self.available_degree[np.newaxis,:]
-        obs = np.concatenate((self.demand,adj,expand_availdeg),axis=0)
-
+        demand_norm = self.demand/(np.max(self.demand)+1e-7)
+        obs = np.concatenate((demand_norm,adj,expand_availdeg),axis=0)
+        obs = obs.flatten()
         self.counter += 1
         if stop:
             reward = self._cal_reward_against_permatch()
@@ -311,11 +314,11 @@ class TopoEnv(gym.Env):
             permatch_score += permatch_path_length * self.demand[s][d]
             nn_score += nn_path_length * self.demand[s][d]
         
-        permatch_score /= (sum(sum(self.demand)))
-        nn_score /= (sum(sum(self.demand)))
+        #permatch_score /= (sum(sum(self.demand)))
+        #nn_score /= (sum(sum(self.demand)))
         #last_score /= (sum(sum(self.demand)) * math.sqrt(self.max_node))
         #cur_score /= (sum(sum(self.demand)) * math.sqrt(self.max_node))
-        return permatch_score - nn_score
+        return (permatch_score - nn_score)/permatch_score
 
 
     def _add_edge(self, action):

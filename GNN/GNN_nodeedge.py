@@ -9,7 +9,7 @@ class model(object):
         self.aggregator_cls = TwoMaxLayerPoolingAggregator
         
         self.dim = 4
-        self.depths = 10
+        self.depths = 6
         self.concat = concat
         self.batch_size = batch_size
         

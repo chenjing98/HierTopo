@@ -1,6 +1,7 @@
 import networkx as nx
 import numpy as np
 import itertools
+import copy
 
 class optimal(object):
     def __init__(self):
@@ -18,7 +19,7 @@ class optimal(object):
             optimal V: in order to pretrain the RL model supervisedly
         """
         self.num_node = num_node
-        self.graph = graph
+        self.graph = copy.deepcopy(graph)
         self.demand = demand
         self.allowed_degree = allowed_degree
         # Update available degree
@@ -53,7 +54,37 @@ class optimal(object):
             if "right" in neigh:
                 self._remove_edge(neigh["right"],v2)
 
-        return self.graph
+            return bestaction, neigh, self.graph
+        else:
+            return [], dict(), graph
+
+    def consturct_v(self, best_action, neighbor_to_remove):
+        """Constructiong a vector V for supervised learning.
+        Args: 
+            best_action: (list) the node pair to be added
+            neighbor_to_remove: (dict) keys may contains "left" and "right"
+        
+        Returns:
+            v: (nparray) a vector V for voltages
+        """
+        v = np.zeros((self.num_node,),np.float32)
+        if len(best_action) == 0:
+            return v
+        upper_demand = np.triu(self.demand,k=1)
+        lower_demand = np.tril(self.demand,k=-1)        
+        sum_demand_u = np.sum(upper_demand)
+        sum_demand_l = np.sum(lower_demand)
+        v1 = best_action[0]
+        v2 = best_action[1]
+        v[v1] = -1.0
+        v[v2] = 1.0
+        if "left" in neighbor_to_remove:
+            v[neighbor_to_remove["left"]] = -0.5
+        if "right" in neighbor_to_remove:
+            v[neighbor_to_remove["right"]] = 0.5
+        if sum_demand_l > sum_demand_u:
+            v = -v
+        return v
 
     def consideration(self,v1,v2):
         neighbors1 = [n for n in self.graph.neighbors(v1)]
