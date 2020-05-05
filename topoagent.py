@@ -9,10 +9,10 @@ from stable_baselines.common.env_checker import check_env
 from topoenv import TopoEnv
 from policynet_v2 import GnnPolicy
 
-MODEL_NAME = "gnnppo4topo1"
+MODEL_NAME = "gnnppo4topo_new1"
 TENSORBOARD_LOG_DIR =  'tensorlog_topo'
-TRAINSTEPS = 3200000
-HAS_PRETRAINED = False
+TRAINSTEPS = 100000
+HAS_PRETRAINED = True
 
 def env_fn():
     env = TopoEnv()
@@ -24,15 +24,15 @@ def main():
         os.makedirs(TENSORBOARD_LOG_DIR)
 
     env_fns = []
-    for _ in range(32):
+    for _ in range(2):
         env_fns.append(env_fn)
 
     vec_env = DummyVecEnv(env_fns)
 
     if HAS_PRETRAINED:
-        model = PPO2.load("gnn_ppo4topo8",vec_env)
+        model = PPO2.load("gnnppo4topo_pretrain",vec_env)
     else:
-        model = PPO2(GnnPolicy, vec_env, gamma=1, n_steps=4, verbose=1, tensorboard_log=TENSORBOARD_LOG_DIR)
+        model = PPO2(GnnPolicy, vec_env, gamma=1,verbose=1, tensorboard_log=TENSORBOARD_LOG_DIR)
 
     print("Model built.")
     model.learn(total_timesteps=TRAINSTEPS)

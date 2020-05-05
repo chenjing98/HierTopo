@@ -36,7 +36,7 @@ class TopoEnv(gym.Env):
         self.reset()
 
         # define action space and observation space
-        self.action_space = spaces.Box(low=0.0,high=1.0,shape=(self.max_node,)) #node weights
+        self.action_space = spaces.Box(low=-1.0,high=1.0,shape=(self.max_node,)) #node weights
         self.observation_space = spaces.Box(
             low=0.0,high=np.float32(1e6),shape=((self.max_node*2+1)*self.max_node,)) #demand matirx & adjacent matrix & available degrees
 

@@ -36,13 +36,13 @@ class GnnPolicy(ActorCriticPolicy):
     :param kwargs: (dict) Extra keyword arguments for the nature CNN feature extraction
     """
 
-    def __init__(self, sess, ob_space, ac_space, n_env, n_steps, n_batch, reuse=False, layers=None, net_arch=[dict(vf=[64,64])],
+    def __init__(self, sess, ob_space, ac_space, n_env, n_steps, n_batch, reuse=False, layers=None, net_arch=None,
                  act_fun=tf.tanh, scale=False, **kwargs):
         super(GnnPolicy, self).__init__(sess, ob_space, ac_space, n_env, n_steps, n_batch, reuse=reuse,
                                                 scale=scale)
 
         # hyperparameters for GNN
-        self.dims = [4, 8, 1]
+        self.dims = [4, 16, 16, 1]
 
         self.num_n = 8 # max_node in the environment
         self.max_degree = 4
@@ -56,13 +56,13 @@ class GnnPolicy(ActorCriticPolicy):
 
         if net_arch is None:
             if layers is None:
-                layers = [64, 64]
+                layers = [128, 128]
             net_arch = [dict(vf=layers, pi=layers)]
 
         with tf.variable_scope("gnn", reuse=reuse):
             
             self._obs_process(self.processed_obs)
-            gnnnet = model(self.num_n,self.max_degree,32) #batch_size equals n_minibatch
+            gnnnet = model(self.num_n,self.max_degree,self.dims) #batch_size equals n_minibatch
             v_final = gnnnet.forward(self.adj,self.demand,self.available_degree)
             graph_latent = v_final
             #self.gnn_weights, self.gnn_bias = self._para_init()
@@ -71,7 +71,11 @@ class GnnPolicy(ActorCriticPolicy):
 
         with tf.variable_scope("model", reuse=reuse):
 
-            pi_latent, vf_latent = mlp_extractor(tf.layers.flatten(graph_latent), net_arch, act_fun)
+            pi_latent, vf_latent = mlp_extractor(
+                tf.cond(tf.equal(tf.size(graph_latent), 0),
+                    lambda:tf.reshape(graph_latent,[-1,self.num_n]),
+                    lambda:tf.layers.flatten(graph_latent)),
+                net_arch, act_fun)
 
             self._value_fn = linear(vf_latent, 'vf', 1)
 

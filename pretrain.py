@@ -47,6 +47,7 @@ class pretrainDataset(object):
             expand_availdeg = available_degree[np.newaxis,:]
             demand_norm = demand/(np.max(demand)+1e-7)
             ob = np.concatenate((demand_norm,adj,expand_availdeg),axis=0)
+            ob = np.reshape(ob,((2*self.num_n+1)*self.num_n,))
             obs.append(ob)
             episode_starts.append(True)
             best_action, neigh, topo_new = self.opt.compute_optimal(self.num_n,topo,demand,allowed_degree)

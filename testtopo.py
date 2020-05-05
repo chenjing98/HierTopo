@@ -15,7 +15,7 @@ import networkx as nx
 from whatisoptimal import optimal
 #from h_shortest_path import TopoEnv,TopoOperator
 
-MODEL_NAME = "gnn_ppo4topo"
+MODEL_NAME = "gnnppo4topo_pretrain1"
 NUM_NODE = 8
 COUNT = 8 # ?
 ITERS = 1000
@@ -117,9 +117,8 @@ def main():
         #done = False
         steps = 0
         for _ in range(1):
-            obs = np.tile(obs[np.newaxis,:,:],[32,1,1])
+            #obs = np.tile(obs[np.newaxis,:,:],[32,1,1])
             action, _ = policy.predict(obs)
-            action = action[0,:]
             obs, _, done, _ = env.step(action)
             steps += 1
         state_n = obs2adj(obs,node_num)
@@ -128,15 +127,15 @@ def main():
         score_n = compute_reward(state_n, node_num, demand, degree, 100)
         scores_nn.append(score_n)
 
-        adj = origin_obs[node_num:-1,:]
+        adj = obs2adj(origin_obs,node_num)
         origin_graph = nx.from_numpy_matrix(adj)
-        opt_graph = opt.compute_optimal(node_num,origin_graph,demand,degree)
+        _,_,opt_graph = opt.compute_optimal(node_num,origin_graph,demand,degree)
         state_o = np.array(nx.adjacency_matrix(opt_graph).todense(), np.float32)
         score_o = compute_reward(state_o, node_num, demand, degree, 100)
         scores_o.append(score_o)
 
         # 2-step weighted matching for comparison
-        adj = origin_obs[node_num:-1,:]
+        #adj = origin_obs[node_num:-1,:]
         origin_graph = nx.from_numpy_matrix(adj)
         permatch_new_graph = permatch_model.n_steps_matching(
             demand,origin_graph,degree,1)
@@ -178,6 +177,7 @@ def obs2adj(obs,node_num):
     :param obs: N x (N+1) matrix for adjacent matrix with edge features and a vector with node features
     :return: adjacent matrix
     """
+    obs = np.reshape(obs,((2*node_num+1),node_num))
     adj = obs[node_num:-1,:]
     #adj[adj>0] = 1
     return adj
