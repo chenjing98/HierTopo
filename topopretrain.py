@@ -10,10 +10,10 @@ from stable_baselines.gail.dataset.dataset import ExpertDataset
 from topoenv import TopoEnv
 from policynet_v2 import GnnPolicy
 
-MODEL_NAME = "gnnppo4topo_pretrain2"
+MODEL_NAME = "gnnppo4topo_pretrain_0510_1"
 TENSORBOARD_LOG_DIR =  'tensorlog_topo'
-TRAINSTEPS = 320000
-HAS_PRETRAINED = False
+#TRAINSTEPS = 320000
+HAS_PRETRAINED = True
 
 def env_fn():
     env = TopoEnv()
@@ -31,13 +31,13 @@ def main():
     vec_env = DummyVecEnv(env_fns)
 
     if HAS_PRETRAINED:
-        model = PPO2.load("gnn_ppo4topo8",vec_env)
+        model = PPO2.load("gnnppo4topo_pretrain_0510",vec_env)
     else:
         model = PPO2(GnnPolicy, vec_env, gamma=1, verbose=1, tensorboard_log=TENSORBOARD_LOG_DIR)
 
     print("Model built.")
-    dataset = ExpertDataset(expert_path="./pretraindata.npz",batch_size=128)
-    model.pretrain(dataset,n_epochs=100)
+    dataset = ExpertDataset(expert_path="./pretraindata_big_fixtopo.npz",batch_size=32)
+    model.pretrain(dataset,n_epochs=50)
     print("Pretraining terminated.")
 
     # save model

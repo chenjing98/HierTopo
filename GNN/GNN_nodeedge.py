@@ -3,7 +3,7 @@ import tensorflow as tf
 from GNN.aggregator import TwoMaxLayerPoolingAggregator
 
 class model(object):
-    def __init__(self, num_n, max_degree, dims, dropout=.4, concat=False, **kwargs):
+    def __init__(self, num_n, max_degree, dims, dropout=.1, concat=False, **kwargs):
         self.num_n = num_n
         self.max_degree = max_degree
         self.aggregator_cls = TwoMaxLayerPoolingAggregator
@@ -48,7 +48,7 @@ class model(object):
 
         Returns:
             node_features: [batch_size, N, N, N, dim], 
-                dim=4,including available degrees, current degrees, out_demand, in_demand
+                dim=3,including available degrees, out_demand, in_demand
         """
 
         batch_size = tf.shape(demand)[0]
@@ -59,9 +59,9 @@ class model(object):
         out_demand = tf.multiply(expand_demand, absrow)
         in_demand = tf.multiply(expand_demand, abscol)
         expand_avail_degree = tf.tile(tf.expand_dims(available_degrees,1),[1,self.num_n,self.num_n,1])
-        current_degrees = tf.reduce_sum(adj,axis=-1)
-        expand_curr_degree = tf.tile(tf.expand_dims(tf.expand_dims(current_degrees,1),1),[1,self.num_n,self.num_n,1])
-        features = [tf.expand_dims(expand_avail_degree,-1),tf.expand_dims(expand_curr_degree,-1),\
+        #current_degrees = tf.reduce_sum(adj,axis=-1)
+        #expand_curr_degree = tf.tile(tf.expand_dims(tf.expand_dims(current_degrees,1),1),[1,self.num_n,self.num_n,1])
+        features = [tf.expand_dims(expand_avail_degree,-1),#tf.expand_dims(expand_curr_degree,-1),\
             tf.expand_dims(out_demand,-1),tf.expand_dims(in_demand,-1)]
         node_features = tf.concat(features,-1)
         return node_features
@@ -81,7 +81,8 @@ class model(object):
         available_degrees = 2 * tf.ones_like(current_degrees)
         out_demand = tf.zeros_like(current_degrees)
         in_demand = tf.zeros_like(current_degrees)
-        features = [available_degrees, current_degrees, out_demand, in_demand]
+        #features = [available_degrees, current_degrees, out_demand, in_demand]
+        features = [available_degrees, out_demand, in_demand]
         edge_features_perflow = tf.concat(features, -1)
         edge_features = tf.tile(tf.expand_dims(tf.expand_dims(edge_features_perflow,1), 1),[1,self.num_n, self.num_n, 1,1,1])
         return edge_features

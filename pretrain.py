@@ -13,8 +13,8 @@ from baseline_new.permatch import permatch
 
 class pretrainDataset(object):
     def __init__(self,num_n=8,
-                      fpath='10M_8_3.0_const3_pretrain.pk3',
-                      fpath_topo='10M_8_3.0_const3_topo_pretrain.pk3'):
+                      fpath='10M_8_3.0_const3_pretrain_big.pk3',
+                      fpath_topo='10M_8_3.0_const3_topo_pretrain_big.pk3'):
 
         self.num_n = num_n
         self.opt = optimal()
@@ -35,15 +35,17 @@ class pretrainDataset(object):
         episode_returns = []
         obs = []
         episode_starts = []
+        num_topo = 32
 
         for idx in range(dataset_size):
             demand = self.dataset[idx]['demand']
             allowed_degree = self.dataset[idx]['allowed_degree']
-            topo_dict = self.topo_dataset[idx]
-            topo = nx.from_dict_of_dicts(topo_dict)
-            degree_inuse = np.array(topo.degree)[:,-1]
+            if idx % (dataset_size/num_topo) == 0:
+                topo_dict = self.topo_dataset[idx]
+                topo = nx.from_dict_of_dicts(topo_dict)
+                degree_inuse = np.array(topo.degree)[:,-1]
+                adj = np.array(nx.adjacency_matrix(topo).todense(), np.float32)
             available_degree = allowed_degree - degree_inuse
-            adj = np.array(nx.adjacency_matrix(topo).todense(), np.float32)
             expand_availdeg = available_degree[np.newaxis,:]
             demand_norm = demand/(np.max(demand)+1e-7)
             ob = np.concatenate((demand_norm,adj,expand_availdeg),axis=0)
@@ -57,7 +59,7 @@ class pretrainDataset(object):
             episode_returns.append(epi_return)
             print("[Index {}]".format(idx))
 
-        np.savez("./pretraindata.npz",
+        np.savez("./pretraindata_big_fixtopo.npz",
                 actions=actions,
                 episode_returns=episode_returns,
                 obs=obs,

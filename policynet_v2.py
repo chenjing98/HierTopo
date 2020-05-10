@@ -36,13 +36,13 @@ class GnnPolicy(ActorCriticPolicy):
     :param kwargs: (dict) Extra keyword arguments for the nature CNN feature extraction
     """
 
-    def __init__(self, sess, ob_space, ac_space, n_env, n_steps, n_batch, reuse=False, layers=None, net_arch=None,
+    def __init__(self, sess, ob_space, ac_space, n_env, n_steps, n_batch, reuse=False, layers=None, net_arch=[dict(vf=[64,64])],
                  act_fun=tf.tanh, scale=False, **kwargs):
         super(GnnPolicy, self).__init__(sess, ob_space, ac_space, n_env, n_steps, n_batch, reuse=reuse,
                                                 scale=scale)
 
         # hyperparameters for GNN
-        self.dims = [4, 16, 16, 1]
+        self.dims = [3, 64, 64,1]
 
         self.num_n = 8 # max_node in the environment
         self.max_degree = 4
@@ -56,7 +56,7 @@ class GnnPolicy(ActorCriticPolicy):
 
         if net_arch is None:
             if layers is None:
-                layers = [128, 128]
+                layers = [64,64]
             net_arch = [dict(vf=layers, pi=layers)]
 
         with tf.variable_scope("gnn", reuse=reuse):
