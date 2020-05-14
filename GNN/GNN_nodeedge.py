@@ -115,25 +115,6 @@ class model(object):
         """
         batch_size = tf.shape(edge_features)[0]
         dim = tf.shape(edge_features)[-1]
-        """
-        batch_neighbor_features_list = []
-        for batch_no in range(self.batch_size):
-            batch_adj = tf.gather(adj,batch_no,axis=0)
-            batch_edge_features = tf.gather(edge_features,batch_no,axis=0) # [N,N,N,N,dim]
-            zeros = tf.zeros_like(
-                tf.tile(tf.reduce_sum(batch_edge_features,-2,keepdims=True),[1,1,1,self.max_degree,1]),
-                tf.float32) # [N,N,N,max_degree,dim]
-            expanded_nfeatures = tf.transpose(tf.concat([batch_edge_features,zeros],axis=-2),[2,3,0,1,4]) # [N,N+max_degree,N,N,dim]
-            expanded_adj = self.expand_deg_adj(batch_adj) # [N, N+max_degree]
-            neighbor_inds = tf.where(expanded_adj)
-            neighbor_features = tf.gather_nd(expanded_nfeatures,neighbor_inds) # [N*max_degree,N,N,dim]
-            neighbor_features = tf.transpose(
-                tf.reshape(neighbor_features,[self.num_n,self.max_degree,self.num_n,self.num_n,dim]),
-                [2,3,0,1,4]) # [N,N,N,max_degree,dim]
-            batch_neighbor_features_list.append(tf.expand_dims(neighbor_features,0))
-        batch_neighbor_features = tf.concat(batch_neighbor_features_list,0)
-        return batch_neighbor_features
-        """
         zeros = tf.zeros_like(
                 tf.tile(tf.reduce_sum(edge_features,-2,keepdims=True),[1,1,1,1,self.max_degree,1]),
                 tf.float32) # [batch_size,N,N,N,max_degree,dim]
