@@ -36,6 +36,7 @@ class model(object):
             edge_features = curr_edge_features
         
         output_features = self.demands_sumup(node_features)
+        output_features = tf.squeeze(output_features,axis=[-1])
         return output_features
     
     def single_node_features(self, adj, demand, available_degrees):
@@ -44,7 +45,7 @@ class model(object):
         Args:
             adj: Adjacency matrix of size [batch_size, N, N]
             demand: demand matrix of size [batch_size, N, N]
-            available_degrees: vector for available degrees of size [batch_size, 1, N]
+            available_degrees: vector for available degrees of size [batch_size, N]
 
         Returns:
             node_features: [batch_size, N, N, N, dim], 
@@ -58,7 +59,7 @@ class model(object):
         abscol = tf.tile(tf.expand_dims(I,1),[1,self.num_n,1,1])
         out_demand = tf.multiply(expand_demand, absrow)
         in_demand = tf.multiply(expand_demand, abscol)
-        expand_avail_degree = tf.tile(tf.expand_dims(available_degrees,1),[1,self.num_n,self.num_n,1])
+        expand_avail_degree = tf.tile(tf.expand_dims(tf.expand_dims(available_degrees,1),1),[1,self.num_n,self.num_n,1])
         #current_degrees = tf.reduce_sum(adj,axis=-1)
         #expand_curr_degree = tf.tile(tf.expand_dims(tf.expand_dims(current_degrees,1),1),[1,self.num_n,self.num_n,1])
         features = [tf.expand_dims(expand_avail_degree,-1),#tf.expand_dims(expand_curr_degree,-1),\

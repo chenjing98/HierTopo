@@ -32,38 +32,44 @@ class pretrainDataset(object):
             the first axis is the timestep, the remaining axes index into the data.
         """
         actions = []
-        episode_returns = []
-        obs = []
-        episode_starts = []
-        num_topo = 32
+        demands = []
+        adjs = []
+        degrees = []
+        #episode_returns = []
+        #obs = []
+        #episode_starts = []
+        #num_topo = 32
 
         for idx in range(dataset_size):
             demand = self.dataset[idx]['demand']
             allowed_degree = self.dataset[idx]['allowed_degree']
-            if idx % (dataset_size/num_topo) == 0:
-                topo_dict = self.topo_dataset[idx]
-                topo = nx.from_dict_of_dicts(topo_dict)
-                degree_inuse = np.array(topo.degree)[:,-1]
-                adj = np.array(nx.adjacency_matrix(topo).todense(), np.float32)
+            #if idx % (dataset_size/num_topo) == 0:
+            topo_dict = self.topo_dataset[idx]
+            topo = nx.from_dict_of_dicts(topo_dict)
+            degree_inuse = np.array(topo.degree)[:,-1]
+            adj = np.array(nx.adjacency_matrix(topo).todense(), np.float32)
             available_degree = allowed_degree - degree_inuse
-            expand_availdeg = available_degree[np.newaxis,:]
+            #expand_availdeg = available_degree[np.newaxis,:]
             demand_norm = demand/(np.max(demand)+1e-7)
-            ob = np.concatenate((demand_norm,adj,expand_availdeg),axis=0)
-            ob = np.reshape(ob,((2*self.num_n+1)*self.num_n,))
-            obs.append(ob)
-            episode_starts.append(True)
+            #ob = np.concatenate((demand_norm,adj,expand_availdeg),axis=0)
+            #ob = np.reshape(ob,((2*self.num_n+1)*self.num_n,))
+            #obs.append(ob)
+            #episode_starts.append(True)
             best_action, neigh, topo_new = self.opt.compute_optimal(self.num_n,topo,demand,allowed_degree)
             action = self.opt.consturct_v(best_action,neigh)
             actions.append(action)
-            epi_return = self._cal_reward_against_permatch(demand,allowed_degree,topo,topo_new)
-            episode_returns.append(epi_return)
+            demands.append(demand_norm)
+            adjs.append(adj)
+            degrees.append(available_degree)
+            #epi_return = self._cal_reward_against_permatch(demand,allowed_degree,topo,topo_new)
+            #episode_returns.append(epi_return)
             print("[Index {}]".format(idx))
 
-        np.savez("./pretraindata_big_fixtopo.npz",
-                actions=actions,
-                episode_returns=episode_returns,
-                obs=obs,
-                episode_starts=episode_starts)
+        np.savez("./dataset_{0}_{1}.npz".format(self.num_n,dataset_size),
+                v=actions,
+                demand=demands,
+                adj=adjs,
+                degree=degrees)
 
     def _cal_reward_against_permatch(self,demand,allowed_degree,topo,topo_new):
         nn_score = 0
@@ -95,5 +101,5 @@ def main():
     pretrain_dataset = pretrainDataset()
     pretrain_dataset.collect_data()
 
-
-main()
+if __name__ == "__main__":
+    main()
