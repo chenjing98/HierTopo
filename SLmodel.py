@@ -121,7 +121,7 @@ class supervisedModel(object):
         batch_v = np.concatenate(tuple(vs), axis=0)
         return batch_demand, batch_adj, batch_deg, batch_v
 
-    def train(self, dataset_file, num_data, train_steps=10000000, save_step=100000, tb_log_interval=100):
+    def train(self, dataset_file, num_data, train_steps=100000, save_step=1000, tb_log_interval=2):
         # Load dataset
         self.dataset = np.load(dataset_file, allow_pickle=True)
         ind_sampler = iter(BatchSampler(num_data, self.batch_size, False))
@@ -138,8 +138,8 @@ class supervisedModel(object):
             if self.enable_summary_writer and (step + 1) % tb_log_interval == 0:
                 summary_str = self.sess.run(self.merged_summary_op)
                 self.summary_writer.add_summary(summary_str, step)
-            if (step + 1) % 10 == 0:
-                print("Step: {0} | Loss: {1:.7f}".format(step + 1, loss))
+            #if (step + 1) % 10 == 0:
+            print("Step: {0} | Loss: {1:.7f}".format(step + 1, loss))
             if step > 0 and (step + 1) % save_step == 0:
                 if self.enable_saver:
                     self.save(step)
@@ -158,6 +158,7 @@ class supervisedModel(object):
 
     def load_model(self, model):
         pass
+
 
 class BatchSampler(object):
     """BatchSampler to yield a mini-batch of indices.
@@ -191,14 +192,17 @@ class BatchSampler(object):
 
     def __iter__(self):
         batch = []
-        for idx in self.sampler:
-            batch.append(idx)
+        idx = 0
+        while True:
+            if idx%self.num_data == 0:
+                self.shuffle()
+            batch.append(self.sampler[idx%self.num_data])
+            idx += 1
             if len(batch) == self.batch_size:
                 yield batch
                 batch = []
-        if len(batch) > 0 and not self.drop_last:
-            yield batch
-        self.shuffle()
+        #if len(batch) > 0 and not self.drop_last:
+        #    yield batch
 
     def __len__(self):
         if self.drop_last:
@@ -211,8 +215,11 @@ class BatchSampler(object):
 
 def main():
     with tf.Session() as sess:
-        train_model = supervisedModel(sess,8,4,[3,64,1],batch_size=32,save_path="./model",summary_path="./summary")
-        train_model.train("./dataset_8_64000.npz", 64000)
+        train_model = supervisedModel(sess,8,4,[3,64,1],
+                                      batch_size=64,save_path="./model/saved_model",
+                                      enable_summary_writer=False,
+                                      summary_path="./summary")
+        train_model.train("./dataset_8_64000.npz", 6400)
 
 if __name__ == "__main__":
     main()
