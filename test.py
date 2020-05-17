@@ -47,6 +47,11 @@ def main():
     scores_opt = []
     scores_greedy = []
 
+    collect_demand = []
+    collect_adj = []
+    collect_deg = []
+    collect_act = []
+
     permatch_model = permatch(node_num)
 
     fpath = folder+'test'+str(node_num)+'_'+str(80)+'_'+str(4)+'.pk'
@@ -55,7 +60,7 @@ def main():
 
     with tf.Session() as sess:
         model = supervisedModel(sess, 8 ,4, [3,64,1])
-        ckpt = tf.train.get_checkpoint_state('./')
+        ckpt = tf.train.get_checkpoint_state('./model/')
         saver = tf.train.Saver()
         saver.restore(sess,ckpt.model_checkpoint_path)
         for i_iter in range(ITERS):
@@ -84,16 +89,24 @@ def main():
             action = np.squeeze(potential)
             obs, _, _, _ = env.step(action)
             state_n = obs2adj(obs,node_num)
-            print(state_n)
+            print(action)
             score_n = compute_reward(state_n, node_num, demand, degree, 100)
             scores_nn.append(score_n)
 
+            collect_demand.append(np.squeeze(demand_input))
+            collect_adj.append(np.squeeze(adj_input))
+            collect_deg.append(np.squeeze(deg_input))
+
             adj = obs2adj(origin_obs,node_num)
             origin_graph = nx.from_numpy_matrix(adj)
-            _,_,opt_graph = opt.compute_optimal(node_num,origin_graph,demand,degree)
+            best_action,neigh,opt_graph = opt.compute_optimal(node_num,origin_graph,demand,degree)
+            print("OPT: {}".format(best_action))
             state_o = np.array(nx.adjacency_matrix(opt_graph).todense(), np.float32)
             score_o = compute_reward(state_o, node_num, demand, degree, 100)
             scores_opt.append(score_o)
+            v_optimal = opt.consturct_v(best_action,neigh)
+
+            collect_act.append(0.5*action/(np.max(action)+1e-7)+v_optimal+1)
 
             # 2-step weighted matching for comparison
             origin_graph = nx.from_numpy_matrix(adj)
@@ -109,6 +122,12 @@ def main():
         
     print("Avg_scores: egotree{0} permatch{1} nn{2} opt{3} greedy{4}".format(
         np.mean(scores_ego),np.mean(scores_match),np.mean(scores_nn),np.mean(scores_opt),np.mean(scores_greedy)))
+    
+    np.savez("./dataset_{0}_{1}_dagger.npz".format(node_num,ITERS),
+                v=collect_act,
+                demand=collect_demand,
+                adj=collect_adj,
+                degree=collect_deg)
 
 def obs2adj(obs,node_num):
     """

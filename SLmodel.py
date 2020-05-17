@@ -121,7 +121,7 @@ class supervisedModel(object):
         batch_v = np.concatenate(tuple(vs), axis=0)
         return batch_demand, batch_adj, batch_deg, batch_v
 
-    def train(self, dataset_file, num_data, train_steps=100000, save_step=1000, tb_log_interval=2):
+    def train(self, dataset_file, num_data, train_steps=10000, save_step=1000, tb_log_interval=2):
         # Load dataset
         self.dataset = np.load(dataset_file, allow_pickle=True)
         ind_sampler = iter(BatchSampler(num_data, self.batch_size, False))
@@ -219,7 +219,7 @@ def main():
                                       batch_size=64,save_path="./model/saved_model",
                                       enable_summary_writer=False,
                                       summary_path="./summary")
-        train_model.train("./dataset_8_64000.npz", 6400)
+        train_model.train("./dataset_8_10000_dagger.npz", 6400)
 
 if __name__ == "__main__":
     main()
