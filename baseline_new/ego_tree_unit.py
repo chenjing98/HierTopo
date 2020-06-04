@@ -1,7 +1,7 @@
 import numpy as np
 import math
 
-class ego_tree_unit:
+class ego_tree_unit(object):
     def __init__(self, demand, node_num, degree, max_degree):
         #params introduction
         #help record the insert position : help[e1*node_num+e2,0] record whether (e1,e2) is inserted

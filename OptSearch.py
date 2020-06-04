@@ -132,12 +132,12 @@ class TopoOperator(object):
         #print("V {}".format(newV))
         return newV
     
-    def run_onestep(self, graph, demand, no):
+    def run_onestep(self, graph, demand, no, begin=0, end=3, num= 30, folder=None):
         """
         :param graph: (dict)
         :param demand: (matrix) a demand matrix
         """
-        alpha_range = np.linspace(start=0, stop=2, num = 20)
+        alpha_range = np.linspace(start=begin, stop=end, num =num+1)
         alpha_range = alpha_range.tolist()
         v_scans = []
         for alpha_v in alpha_range:
@@ -154,20 +154,20 @@ class TopoOperator(object):
                     v += np.array(v_i)
                 v /= len(srcs)
                 v_scans.append({'alpha_v':alpha_v,'alpha_i':alpha_i,'v':v})
-        file_name = './vtest/'+'vscans_'+str(no)+'.pk'
+        file_name = folder + 'alpha_v_' + str(no) + '.pk'
         with open(file_name, 'wb') as f:
             pk.dump(v_scans, f)
     
-    def run_multistep(self, graph, demand, no, n_steps):
+    def run_multistep(self, graph, demand, no, n_steps, begin=0, end=3, num= 30, folder=None):
         """
         :param graph: (dict)
         :param demand: (matrix) a demand matrix
         :param no: (int) a sequential number for file name
         :param n_steps: (int) how many steps to run
         """
-        alpha_range = np.linspace(start=0, stop=3, num = 31)
+        alpha_range = np.linspace(start=begin, stop=end, num=num+1)
         alpha_range = alpha_range.tolist()
-        v_scans = []
+        cost_scans = []
         for alpha_v in alpha_range:
             for alpha_i in alpha_range:
                 # scan for best alpha_v and alpha_i
@@ -196,12 +196,17 @@ class TopoOperator(object):
                                                    topology=dict2nxdict(self.max_node,curr_graph), 
                                                    allowed_degree=self.allowed_degree)
                 print("cost {}".format(cost))
-                v_scans.append({'alpha_v':alpha_v,'alpha_i':alpha_i,'cost':cost})
-        file_name = './search/'+'alpha_cost_'+str(no)+'.pk'
+                cost_scans.append({'alpha_v':alpha_v,'alpha_i':alpha_i,'cost':cost})
+        file_name = folder + 'alpha_cost_' + str(no) + '.pk'
         with open(file_name, 'wb') as f:
-            pk.dump(v_scans, f)
+            pk.dump(cost_scans, f)
 
     def predict(self, topo, demand):
+        """
+        :param topo: (nxdict)
+        :param demand: (nparray)
+        :return: v: (nparray)
+        """
         graph = dict2dict(self.max_node,topo)
         srcs, dsts = demand.nonzero()
         v = np.zeros((self.max_node,))
@@ -239,19 +244,32 @@ def dict2nxdict(n_node, dic):
     return graph_dict
 
 def main():
-    opr = TopoOperator(4)
-    with open('10000_4_3.pk3', 'rb') as f1:
-        dataset = pk.load(f1)
-    with open('10000_4_3_topo.pk3', 'rb') as f2:
-        topo_dataset = pk.load(f2)
-
+    # Set parameters
     start_no = args.start
-    for i in range(125):
+    n_node = 8
+    n_steps = 4
+    n_search = 125
+    search_begin = 0
+    search_end = 3
+    search_num = 30
+    folder = './search_8nodes_4steps/'
+    file_demand_degree = '10000_8_4.pk3'
+    file_topo = '10000_8_4_topo.pk3'
+    
+    opr = TopoOperator(n_node)
+    with open(file_demand_degree, 'rb') as f1:
+        dataset = pk.load(f1)
+    with open(file_topo, 'rb') as f2:
+        topo_dataset = pk.load(f2)
+    
+    for i in range(n_search):
         print("======== No {} =======".format(i+start_no))
         demand = dataset[i+start_no]['demand']
         topo = topo_dataset[i+start_no]
-        graph = dict2dict(4,topo)
-        opr.run_multistep(graph, demand, i+start_no, 4)
+        graph = dict2dict(n_node,topo)
+        opr.run_multistep(graph, demand, i+start_no, n_steps,
+                          begin=search_begin,end=search_end,num=search_num,
+                          folder=folder)
 
 if __name__ == "__main__":
     main()

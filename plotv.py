@@ -5,8 +5,6 @@ import numpy as np
 import copy
 import networkx as nx
 
-with open("vtest.pk3",'rb') as f:
-    data = pk.load(f)
 
 def compute_reward(state, num_node, demand, degree):    
     D = copy.deepcopy(state)
@@ -41,7 +39,7 @@ class TopoSimulator(object):
         :param action: (nparray) v
         :param no: (int) the index of the dataset
         :param demand: (nparray)
-        :param topology: (dict)
+        :param topology: (nxdict)
         :param allowed_degree: (nparray)
         :return: cost: (float)
         """
@@ -112,9 +110,9 @@ class TopoSimulator(object):
         :param n_node: (int) number of nodes
         :param action: (nparray) v
         :param demand: (nparray)
-        :param topology: (dict)
+        :param topology: (nxdict)
         :param allowed_degree: (nparray)
-        :return: new_graph: (dict)
+        :return: new_graph: (nxdict)
         """
         self.demand = demand
         self.allowed_degree = allowed_degree
@@ -250,24 +248,37 @@ class TopoSimulator(object):
         self.Pvec = P
 
 def main():
-    simulator = TopoSimulator()
-    alpha_range = np.linspace(start=0, stop=2, num = 20)
+    n_samples = 13
+    folder = './search_8_nodes_4steps'
+    n_scan = 30
+    #simulator = TopoSimulator()
+    alpha_range = np.linspace(start=0, stop=3, num = n_scan + 1)
     alpha_range = alpha_range.tolist()
-    vscans = np.zeros((19,19))
-    for _ in range(1452):
+    vscans = np.zeros((n_scan,n_scan))
+    for no in range(n_samples):
+        file_name = folder+'alpha_cost_'+str(no)+'.pk'
+        with open(file_name,'rb') as f:
+            data = pk.load(f)
         costs = []
         i = 0
         for alpha_v in alpha_range:
-            print(alpha_v)
+            #print(alpha_v)
             for alpha_i in alpha_range:
                 if alpha_v == 0 or alpha_i == 0:
                     continue
-                cost = simulator.step(8,data[i]['v'],0)
+                #cost = simulator.step(8,data[i]['v'],0)
+                if data[i]['alpha_v'] == alpha_v and data[i]['alpha_i'] == alpha_i:
+                    cost = data[i]['cost']
+                else:
+                    print('ERROR No.{0} i {1} alpha_v {2} alpha_i {3}'.format(
+                        no, i, alpha_v, alpha_i
+                    ))
                 costs.append(cost)
                 i += 1
         costs = np.array(costs)
-        costs = costs.reshape((19,19))
+        costs = costs.reshape((n_scan,n_scan))
         vscans += costs
+    print(np.min(vscans))
     print(np.where(vscans == np.min(vscans)))
     vscans.tolist()
     print(vscans)

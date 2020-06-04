@@ -2,10 +2,12 @@ import pickle as pk
 import numpy as np
 import networkx as nx
 
+# Set parameters
 data_count = 10000
 dataset = []
 num_nodes = 8
-allowed_degree = np.ones(num_nodes) * 3
+allowed_degree = np.ones(num_nodes) * 4
+file_name = '10000_8_4_topo_test.pk3'
 
 def random_topology_generator(num_node, allowed_degree, tries=5):
     p = np.random.randn()
@@ -62,6 +64,6 @@ while i < data_count:
 print("[total datasize {}]".format(dataset_size))
 
     
-with open('10M_8_3.0_const3_topo.pk3', 'wb') as f:
+with open(file_name, 'wb') as f:
     pk.dump(dataset, f)
 

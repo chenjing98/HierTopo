@@ -12,7 +12,7 @@ from policynet_v2 import GnnPolicy
 MODEL_NAME = "gnnppo4topo_new1"
 TENSORBOARD_LOG_DIR =  'tensorlog_topo'
 TRAINSTEPS = 100000
-HAS_PRETRAINED = True
+HAS_PRETRAINED = False
 
 def env_fn():
     env = TopoEnv()
