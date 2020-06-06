@@ -19,7 +19,6 @@ class TopoOperator(object):
         self.inf = infinity
         self.eps = eps
         self.max_iterstep = max_iterstep
-        self.steps = 4
         self.simulator = TopoSimulator(n_node=n_node)
         self.allowed_degree = 4 * np.ones((n_node, ))
 

@@ -20,7 +20,7 @@ MODEL_NAME = "model"
 ITERS = 1000
 FOLDER = './data/'
 
-def compute_reward(state, num_node, demand, degree,degree_penalty):    
+def compute_reward(state, num_node, demand, degree, degree_penalty):    
     D = copy.deepcopy(state)
     graph = nx.from_numpy_matrix(D)
     cost = 0
@@ -38,8 +38,9 @@ def compute_reward(state, num_node, demand, degree,degree_penalty):
 def main():
     # Set the parameters
     node_num = 8
-    alpha_v = 1.6
+    alpha_v = 1.2
     alpha_i = 0.1
+    n_steps = 1
     file_demand_degree = '10000_8_4_test.pk3'
     file_topo = "10000_8_4_topo_test.pk3"
     
@@ -87,18 +88,21 @@ def main():
         """
 
         # optimal
-        origin_graph = nx.from_dict_of_dicts(topo)
-        best_action,neigh,opt_graph = opt.compute_optimal(node_num,origin_graph,demand,degree)
-        print("OPT: {0}, neighbor2rm {1}".format(best_action,neigh))
+        #origin_graph = nx.from_dict_of_dicts(topo)
+        #best_action,neigh,opt_graph = opt.compute_optimal(node_num,origin_graph,demand,degree)
+        #print("OPT: {0}, neighbor2rm {1}".format(best_action,neigh))
+        opt_dict = opt.multistep_compute_optimal(node_num,topo,demand,degree,n_steps)
+        opt_graph = nx.from_dict_of_dicts(opt_dict)
         state_o = np.array(nx.adjacency_matrix(opt_graph).todense(), np.float32)
         score_o = compute_reward(state_o, node_num, demand, degree, 100)
         scores_opt.append(score_o)
+        
         #v_optimal = opt.consturct_v(best_action,neigh)
 
-        # 2-step weighted matching for comparison
+        # n-step weighted matching for comparison
         origin_graph = nx.from_dict_of_dicts(topo)
         permatch_new_graph = permatch_model.n_steps_matching(
-                demand,origin_graph,degree,1)
+                demand,origin_graph,degree,n_steps)
         state_2m = np.array(nx.adjacency_matrix(permatch_new_graph).todense(), np.float32)
         score_2m = compute_reward(state_2m, node_num, demand, degree, 100)
         scores_greedy.append(score_2m)
@@ -108,7 +112,6 @@ def main():
         #v_weightedsum = opr.predict(topo,demand)
         #print("V_weighted_sum {} ".format(v_weightedsum))
         #score_s = sim.step(8,v_weightedsum,0,demand,topo,degree)
-        n_steps = 1
         curr_graph = topo
         for i_step in range(n_steps):
             v = opr.predict(curr_graph, demand)

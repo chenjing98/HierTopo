@@ -248,8 +248,8 @@ class TopoSimulator(object):
         self.Pvec = P
 
 def main():
-    n_samples = 13
-    folder = './search_8_nodes_4steps'
+    n_samples = 50
+    folder = './search_8nodes_4steps/'
     n_scan = 30
     #simulator = TopoSimulator()
     alpha_range = np.linspace(start=0, stop=3, num = n_scan + 1)
