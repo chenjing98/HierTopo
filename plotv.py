@@ -248,7 +248,7 @@ class TopoSimulator(object):
         self.Pvec = P
 
 def main():
-    n_samples = 50
+    n_samples = 61
     folder = './search_8nodes_4steps/'
     n_scan = 30
     #simulator = TopoSimulator()

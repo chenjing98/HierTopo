@@ -252,8 +252,8 @@ def main():
     search_end = 3
     search_num = 30
     folder = './search_8nodes_4steps/'
-    file_demand_degree = '10000_8_4.pk3'
-    file_topo = '10000_8_4_topo.pk3'
+    file_demand_degree = './data/10000_8_4.pk3'
+    file_topo = './data/10000_8_4_topo.pk3'
     
     opr = TopoOperator(n_node)
     with open(file_demand_degree, 'rb') as f1:

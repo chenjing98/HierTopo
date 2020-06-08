@@ -215,7 +215,7 @@ class optimal(object):
                         for right in range(len(neighbors2)):
                             n_r = neighbors2[right]
                             self._remove_edge(n_r,v2)
-                            if not nx.is_connected(self.graph):
+                            if nx.is_connected(self.graph):
                                 new_topo = nx.to_dict_of_dicts(self.graph)
                                 topos.append(new_topo)
                             #else:
@@ -267,3 +267,22 @@ def edge_to_node(node_num,e):
             #if ((i*(2*node_num-1-i)/2-1+j-i)== e):
                 return [i,j]
             c += 1
+
+"""
+opt = optimal()
+topo = {0: {7: {}}, 1: {4: {}, 7: {}}, 2: {4: {}, 5: {}, 6: {}, 7: {}}, 3: {4: {}, 5: {}, 6: {}}, 4: {1: {}, 2: {}, 3: {}, 6: {}}, 5: {2: {}, 3: {}, 6: {}, 7: {}}, 6: {2: {}, 3: {}, 4: {}, 5: {}}, 7: {0: {}, 1: {}, 2: {}, 5: {}}}
+demand = np.array([
+[0, 4, 1, 1, 3, 4, 5, 1],
+[4, 0, 4, 3, 5, 4, 2, 1],
+[3, 2, 0, 3, 4, 2, 3, 1],
+[0, 5, 2, 0, 2, 7, 3, 2],
+[1, 4, 4, 3, 0, 1, 4, 2],
+[5, 2, 1, 3, 1, 0, 4, 5],
+[4, 6, 1, 1, 3, 0, 0, 3],
+[4, 2, 3, 7, 3, 3, 3, 0]
+])
+
+degree = np.array([4.0, 4.0, 4.0, 4.0, 4.0, 4.0, 4.0, 4.0])
+
+optdict = opt.multistep_compute_optimal(8,topo,demand,degree)
+"""
