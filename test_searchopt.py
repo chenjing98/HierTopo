@@ -40,7 +40,7 @@ def main():
     node_num = 8
     alpha_v = 2.6
     alpha_i = 0.1
-    n_steps = 4
+    n_steps = 1
     file_demand_degree = './data/10000_8_4_test.pk3'
     file_topo = "./data/10000_8_4_topo_test.pk3"
     
@@ -93,12 +93,12 @@ def main():
         #print("OPT: {0}, neighbor2rm {1}".format(best_action,neigh))
         #state_o1 = np.array(nx.adjacency_matrix(opt_graph).todense(), np.float32)
         #score_o1 = compute_reward(state_o1, node_num, demand, degree, 100)
-        opt_dict = opt.multistep_compute_optimal(node_num,topo,demand,degree,n_steps)
+
+        #opt_dict = opt.multistep_compute_optimal(node_num,topo,demand,degree,n_steps)
+        cost, opt_dict = opt.multistep_DFS(node_num,topo,demand,degree,n_steps)
         opt_graph = nx.from_dict_of_dicts(opt_dict)
         state_o = np.array(nx.adjacency_matrix(opt_graph).todense(), np.float32)
         score_o = compute_reward(state_o, node_num, demand, degree, 100)
-        #if not score_o1 == score_o:
-        #    print("wrong")
         scores_opt.append(score_o)
         
         #v_optimal = opt.consturct_v(best_action,neigh)
@@ -130,7 +130,7 @@ def main():
                                    topology=curr_graph, 
                                    allowed_degree=degree)
         scores_sum.append(score_s)
-        print("[iter.{0}][opt:{1}][greedy:{2}][search:{3}]".
+        print("[iter{0}][opt:{1}][greedy:{2}][search:{3}]".
                     format(i_iter,score_o,score_2m,score_s))
 
         

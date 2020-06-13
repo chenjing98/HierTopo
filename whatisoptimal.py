@@ -56,7 +56,145 @@ class optimal(object):
         else:
             return [], dict(), graph
 
-    def multistep_compute_optimal(self,n_nodes,graph,demand,allowed_degree,n_steps=1):
+    def multistep_DFS(self, n_nodes, graph, demand, allowed_degree, n_steps=1):
+        """
+        :param n_nodes: (int) the total number of nodes in the network
+        :param graph: (nxdict) current topology
+        :param demand: (npmatrix) traffic demands in matrix form
+        :param allowed_degree: (nparray) a vector for degree constraints
+        :param n_steps: (int) n_steps optimal is what we want
+        :return: optimal final graph: (nxdict) 
+        """
+        self.n_nodes = n_nodes
+        self.graph = nx.from_dict_of_dicts(graph)
+        self.demand = demand
+        self.allowed_degree = allowed_degree
+        # Update available degree
+        degree_inuse = np.array(self.graph.degree)[:,-1]
+        self.available_degree = self.allowed_degree - degree_inuse
+        self.min_cost = self.cal_cost()
+        self.best_graph = graph
+        curr_dict = []
+        for _ in range(n_steps):
+            curr_dict.append({})
+        origin = nx.to_dict_of_lists(self.graph)
+        notdone = True
+        while(notdone):
+            curr_dict, notdone = self.next_dict(origin, curr_dict, n_steps)
+            cost = self.multistep_predict(n_nodes, graph, curr_dict)
+            if cost < self.min_cost:
+                self.min_cost = cost
+                self.best_graph = nx.to_dict_of_dicts(self.graph)
+        return self.min_cost, self.best_graph
+        
+    def next_dict(self, origin, prev, n_steps):
+        """
+        :param origin: (dict of lists) original graph
+        :param prev: (list of dicts) [{add:[,],neigh:{left:,right:}},...]
+        :param n_steps: (int)
+        :return: dic:(dict) {add:[,],neigh:{left:,right:}}
+        :return: success:(bool) whether successfully found the next dic
+        """
+        dic = prev.copy()
+        for i in range(n_steps):
+            ind = n_steps-1-i
+            if "add" not in prev[ind]:
+                prev_add = []
+                for j in range(n_steps):
+                    if "add" in prev[j]:
+                        prev_add.append(prev[j]["add"])
+                add_nodes, exist_add = self.next_to_add(self.n_nodes, n_steps, origin, prev_add, [0,0])
+                if exist_add:
+                    dic[ind]["add"] = add_nodes    
+                    return dic, True
+                else:
+                    continue
+            add_nodes = prev[ind]["add"]
+            if "neigh" not in prev[ind]:
+                dic[ind]["neigh"] = {}
+                dic[ind]["neigh"]["right"] = origin[add_nodes[1]][0]
+                return dic, True
+            else:
+                if "right" not in prev[ind]["neigh"]:
+                    dic[ind]["neigh"]["right"] = origin[add_nodes[1]][0]
+                    return dic, True
+                elif prev[ind]["neigh"]["right"] != origin[add_nodes[1]][-1]:
+                    current = origin[add_nodes[1]].index(prev[ind]["neigh"]["right"])
+                    dic[ind]["neigh"]["right"] = origin[add_nodes[1]][current+1]
+                    return dic, True
+                elif "left" not in prev[ind]["neigh"]:
+                    dic[ind]["neigh"]["left"] = origin[add_nodes[0]][0]
+                    del dic[ind]["neigh"]["right"]
+                    return dic, True
+                elif prev[ind]["neigh"]["left"] != origin[add_nodes[0]][-1]:
+                    current = origin[add_nodes[0]].index(prev[ind]["neigh"]["left"])
+                    dic[ind]["neigh"]["left"] = origin[add_nodes[0]][current+1]
+                    del dic[ind]["neigh"]["right"]
+                    return dic, True
+                else:
+                    prev_add = []
+                    for j in range(n_steps):
+                        if "add" in prev[j]:
+                            prev_add.append(prev[j]["add"])
+                    next_add_nodes, exist_next_add = self.next_to_add(self.n_nodes, n_steps, origin, prev_add, add_nodes)
+                    if exist_next_add:
+                        dic[ind]["add"] = next_add_nodes
+                        del dic[ind]["neigh"]
+                        return dic, True
+                    else:
+                        continue
+        return [], False
+
+
+
+    def next_to_add(self, n_nodes, n_steps, graph, moves, current_move):
+        found = False
+        for v1 in range(current_move[0], n_nodes):
+            for v2 in range(v1+1,n_nodes):
+                if v1 == current_move[0] and v2 <= current_move[1]:
+                    continue
+                if v2 in graph[v1]:
+                    continue
+                if [v1,v2] in moves:
+                    continue
+                found = True
+                return [v1,v2], found
+        return [], found
+    
+    def multistep_predict(self, n_nodes, graph, moves):
+        """
+        :param n_nodes: (int)
+        :param graph: (nxdict)
+        :param moves: (list of dicts) each item is each step's move, {add:[v1,v2],neigh:{left: .., right: ..}}
+        """
+        valid = True
+        self.graph = nx.from_dict_of_dicts(graph)
+        for i in range(len(moves)):
+            if "add" in moves[i]:
+                add_nodes = moves[i]["add"]
+                self._add_edge(add_nodes[0], add_nodes[1])
+            if "neigh" in moves[i]:
+                if "left" in moves[i]["neigh"]:
+                    self._remove_edge(add_nodes[0],moves[i]["neigh"]["left"])
+                if "right" in moves[i]["neigh"]:
+                    self._remove_edge(add_nodes[1],moves[i]["neigh"]["right"])
+            if not (nx.is_connected(self.graph) and self._check_degree(add_nodes[0]) and self._check_degree(add_nodes[1])):
+                cost = self.inf
+                valid = False
+                break
+        if valid:
+            cost = self.cal_cost()
+        return cost
+        
+    def optimal_topology(self, n_nodes, demand, allowed_degree):
+        """Searching for the best topology.
+        :param n_nodes: (int) 
+        :param demand: (nparray)
+        :param allowed_degree: (nparray)
+        """
+        pass
+
+    def multistep_BFS(self,n_nodes,graph,demand,allowed_degree,n_steps=1):
         """
         Args:
             n_nodes: (int) the total number of nodes in the network
