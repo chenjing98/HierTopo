@@ -229,8 +229,12 @@ class optimal(object):
         min_cost = self.inf
         best_graph = {}
         graph_dict = {}
+        """
         for i in range(min_edges, max_edges + 1):
+            if not i == 16:
+                continue
             edges_comb = list(itertools.combinations(all_edges,i))
+            cnt = 0
             for edges in edges_comb:
                 graph_dict.clear()
                 for j in range(n_nodes):
@@ -243,6 +247,28 @@ class optimal(object):
                 if cost < min_cost:
                     min_cost = cost
                     best_graph = graph_dict
+                cnt += 1
+                if cnt % 10000 == 0:
+                    print("checked: {}".format(cnt))
+        """
+        edges_comb = list(itertools.combinations(all_edges,n_nodes*2))
+        cnt = 0
+        for edges in edges_comb:
+            graph_dict.clear()
+            for j in range(n_nodes):
+                graph_dict[j] = []
+            for e in edges:
+                [n1,n2] = edge_to_node(n_nodes, e)
+                graph_dict[n1].append(n2)
+                graph_dict[n2].append(n1)
+            cost = self.cal_cost_judge(n_nodes,graph_dict,demand,allowed_degree)
+            if cost < min_cost:
+                min_cost = cost
+                best_graph = graph_dict
+            cnt += 1
+            if cnt % 500000 == 0:
+                print("checked: {}".format(cnt))
+
         return min_cost, best_graph
 
     def multistep_BFS(self,n_nodes,graph,demand,allowed_degree,n_steps=1):
@@ -430,13 +456,13 @@ class optimal(object):
         return cost
 
     def cal_cost_judge(self, n_nodes, graph_dict, demand, degree):
-        graph = nx.from_dict_of_lists(graph_dict)
-        if not nx.is_connected(graph):
-            return self.inf
-
         for i in range(n_nodes):
             if len(graph_dict[i]) > degree[i]:
                 return self.inf
+
+        graph = nx.from_dict_of_lists(graph_dict)
+        if not nx.is_connected(graph):
+            return self.inf
 
         cost = 0
         for s, d in itertools.product(range(n_nodes), range(n_nodes)):

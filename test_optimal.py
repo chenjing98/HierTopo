@@ -12,6 +12,7 @@ from plotv import TopoSimulator
 MODEL_NAME = "model"
 ITERS = 1000
 FOLDER = './data/'
+log_file = './logging_opt.pk3'
 
 def compute_reward(state, num_node, demand, degree, degree_penalty):    
     D = copy.deepcopy(state)
@@ -41,6 +42,7 @@ def main():
     with open(file_demand_degree, 'rb') as f1:
         dataset = pk.load(f1)
     
+    f2 = open(log_file, 'wb')
 
     for i_iter in range(ITERS):
         demand = dataset[i_iter]['demand']
@@ -53,8 +55,10 @@ def main():
         
         print("[iter{0}][opt:{1}]".
                     format(i_iter,score_o))
-
-        
+        if i_iter % 50 == 0:
+            pk.dump(f2,[i_iter,np.mean(scores_opt)])
+            print("Avg_scores at iter {0}: {1}".format(i_iter,np.mean(scores_opt)))
+    
     print("Avg_scores: opt{0}".format(np.mean(scores_opt)))
     
     """
