@@ -248,7 +248,7 @@ class TopoSimulator(object):
         self.Pvec = P
 
 def main():
-    n_samples = 61
+    n_samples = 500
     folder = './search_8nodes_4steps/'
     n_scan = 30
     #simulator = TopoSimulator()
@@ -278,7 +278,8 @@ def main():
         costs = np.array(costs)
         costs = costs.reshape((n_scan,n_scan))
         vscans += costs
-    print(np.min(vscans))
+    print(np.min(vscans)/n_samples)
+    print(np.max(vscans)/n_samples)
     print(np.where(vscans == np.min(vscans)))
     vscans.tolist()
     print(vscans)

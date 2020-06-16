@@ -38,9 +38,9 @@ def compute_reward(state, num_node, demand, degree, degree_penalty):
 def main():
     # Set the parameters
     node_num = 8
-    alpha_v = 2.6
+    alpha_v = 1.2
     alpha_i = 0.1
-    n_steps = 1
+    n_steps = 4
     file_demand_degree = './data/10000_8_4_test.pk3'
     file_topo = "./data/10000_8_4_topo_test.pk3"
     

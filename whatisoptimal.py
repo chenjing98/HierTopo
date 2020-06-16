@@ -73,6 +73,7 @@ class optimal(object):
         degree_inuse = np.array(self.graph.degree)[:,-1]
         self.available_degree = self.allowed_degree - degree_inuse
         self.min_cost = self.cal_cost()
+        cost = self.min_cost
         self.best_graph = graph
         curr_dict = []
         for _ in range(n_steps):
@@ -80,14 +81,14 @@ class optimal(object):
         origin = nx.to_dict_of_lists(self.graph)
         notdone = True
         while(notdone):
-            curr_dict, notdone = self.next_dict(origin, curr_dict, n_steps)
+            curr_dict, notdone = self.next_dict(origin, curr_dict, n_steps, (cost<self.inf))
             cost = self.multistep_predict(n_nodes, graph, curr_dict)
             if cost < self.min_cost:
                 self.min_cost = cost
                 self.best_graph = nx.to_dict_of_dicts(self.graph)
         return self.min_cost, self.best_graph
         
-    def next_dict(self, origin, prev, n_steps):
+    def next_dict(self, origin, prev, n_steps, sign=False):
         """
         :param origin: (dict of lists) original graph
         :param prev: (list of dicts) [{add:[,],neigh:{left:,right:}},...]
@@ -105,31 +106,55 @@ class optimal(object):
                         prev_add.append(prev[j]["add"])
                 add_nodes, exist_add = self.next_to_add(self.n_nodes, n_steps, origin, prev_add, [0,0])
                 if exist_add:
-                    dic[ind]["add"] = add_nodes    
+                    dic[ind]["add"] = add_nodes
+                    for j in range(ind+1,n_steps):
+                        dic[j].clear()
                     return dic, True
                 else:
                     continue
             add_nodes = prev[ind]["add"]
             if "neigh" not in prev[ind]:
-                dic[ind]["neigh"] = {}
-                dic[ind]["neigh"]["right"] = origin[add_nodes[1]][0]
-                return dic, True
+                if sign and i == 0:
+                    prev_add = []
+                    for j in range(n_steps):
+                        if "add" in prev[j]:
+                            prev_add.append(prev[j]["add"])
+                    next_add_nodes, exist_add = self.next_to_add(self.n_nodes, n_steps, origin, prev_add, add_nodes)
+                    if exist_add:
+                        dic[ind]["add"] = next_add_nodes
+                        for j in range(ind+1,n_steps):
+                            dic[j].clear()
+                        return dic, True
+                    else:
+                        continue
+                else:
+                    dic[ind]["neigh"] = {}
+                    dic[ind]["neigh"]["right"] = origin[add_nodes[1]][0]
+                    return dic, True
             else:
                 if "right" not in prev[ind]["neigh"]:
                     dic[ind]["neigh"]["right"] = origin[add_nodes[1]][0]
+                    for j in range(ind+1,n_steps):
+                        dic[j].clear()
                     return dic, True
                 elif prev[ind]["neigh"]["right"] != origin[add_nodes[1]][-1]:
                     current = origin[add_nodes[1]].index(prev[ind]["neigh"]["right"])
                     dic[ind]["neigh"]["right"] = origin[add_nodes[1]][current+1]
+                    for j in range(ind+1,n_steps):
+                        dic[j].clear()
                     return dic, True
                 elif "left" not in prev[ind]["neigh"]:
                     dic[ind]["neigh"]["left"] = origin[add_nodes[0]][0]
                     del dic[ind]["neigh"]["right"]
+                    for j in range(ind+1,n_steps):
+                        dic[j].clear()
                     return dic, True
                 elif prev[ind]["neigh"]["left"] != origin[add_nodes[0]][-1]:
                     current = origin[add_nodes[0]].index(prev[ind]["neigh"]["left"])
                     dic[ind]["neigh"]["left"] = origin[add_nodes[0]][current+1]
                     del dic[ind]["neigh"]["right"]
+                    for j in range(ind+1,n_steps):
+                        dic[j].clear()
                     return dic, True
                 else:
                     prev_add = []
@@ -140,15 +165,14 @@ class optimal(object):
                     if exist_next_add:
                         dic[ind]["add"] = next_add_nodes
                         del dic[ind]["neigh"]
+                        for j in range(ind+1,n_steps):
+                            dic[j].clear()
                         return dic, True
                     else:
                         continue
         return [], False
 
-
-
     def next_to_add(self, n_nodes, n_steps, graph, moves, current_move):
-        found = False
         for v1 in range(current_move[0], n_nodes):
             for v2 in range(v1+1,n_nodes):
                 if v1 == current_move[0] and v2 <= current_move[1]:
@@ -157,9 +181,8 @@ class optimal(object):
                     continue
                 if [v1,v2] in moves:
                     continue
-                found = True
-                return [v1,v2], found
-        return [], found
+                return [v1,v2], True
+        return [], False
     
     def multistep_predict(self, n_nodes, graph, moves):
         """
@@ -173,15 +196,23 @@ class optimal(object):
             if "add" in moves[i]:
                 add_nodes = moves[i]["add"]
                 self._add_edge(add_nodes[0], add_nodes[1])
-            if "neigh" in moves[i]:
-                if "left" in moves[i]["neigh"]:
-                    self._remove_edge(add_nodes[0],moves[i]["neigh"]["left"])
-                if "right" in moves[i]["neigh"]:
-                    self._remove_edge(add_nodes[1],moves[i]["neigh"]["right"])
-            if not (nx.is_connected(self.graph) and self._check_degree(add_nodes[0]) and self._check_degree(add_nodes[1])):
-                cost = self.inf
-                valid = False
-                break
+                if "neigh" in moves[i]:
+                    if "left" in moves[i]["neigh"]:
+                        if not self.graph.has_edge(add_nodes[0],moves[i]["neigh"]["left"]):
+                            cost = self.inf
+                            valid = False
+                            break
+                        self._remove_edge(add_nodes[0],moves[i]["neigh"]["left"])
+                    if "right" in moves[i]["neigh"]:
+                        if not self.graph.has_edge(add_nodes[1],moves[i]["neigh"]["right"]):
+                            cost = self.inf
+                            valid = False
+                            break
+                        self._remove_edge(add_nodes[1],moves[i]["neigh"]["right"])
+                if not (nx.is_connected(self.graph) and self._check_degree(add_nodes[0]) and self._check_degree(add_nodes[1])):
+                    cost = self.inf
+                    valid = False
+                    break
         if valid:
             cost = self.cal_cost()
         return cost
@@ -192,7 +223,27 @@ class optimal(object):
         :param demand: (nparray)
         :param allowed_degree: (nparray)
         """
-        pass
+        max_edges = int(n_nodes * (n_nodes-1) / 2)
+        min_edges = n_nodes - 1
+        all_edges = list(range(max_edges))
+        min_cost = self.inf
+        best_graph = {}
+        graph_dict = {}
+        for i in range(min_edges, max_edges + 1):
+            edges_comb = list(itertools.combinations(all_edges,i))
+            for edges in edges_comb:
+                graph_dict.clear()
+                for j in range(n_nodes):
+                    graph_dict[j] = []
+                for e in edges:
+                    [n1,n2] = edge_to_node(n_nodes, e)
+                    graph_dict[n1].append(n2)
+                    graph_dict[n2].append(n1)
+                cost = self.cal_cost_judge(n_nodes,graph_dict,demand,allowed_degree)
+                if cost < min_cost:
+                    min_cost = cost
+                    best_graph = graph_dict
+        return min_cost, best_graph
 
     def multistep_BFS(self,n_nodes,graph,demand,allowed_degree,n_steps=1):
         """
@@ -376,6 +427,24 @@ class optimal(object):
 
             cost += path_length * self.demand[s][d]
         
+        return cost
+
+    def cal_cost_judge(self, n_nodes, graph_dict, demand, degree):
+        graph = nx.from_dict_of_lists(graph_dict)
+        if not nx.is_connected(graph):
+            return self.inf
+
+        for i in range(n_nodes):
+            if len(graph_dict[i]) > degree[i]:
+                return self.inf
+
+        cost = 0
+        for s, d in itertools.product(range(n_nodes), range(n_nodes)):
+            try:
+                path_length = float(nx.shortest_path_length(graph,source=s,target=d))
+            except nx.exception.NetworkXNoPath:
+                path_length = float(n_nodes)
+            cost += path_length * demand[s][d]
         return cost
 
     def _add_edge(self, v1, v2):
