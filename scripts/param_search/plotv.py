@@ -24,7 +24,7 @@ def compute_reward(state, num_node, demand, degree):
 
 class TopoSimulator(object):
     def __init__(self, n_node=8, 
-                 fpath='10M_8_3.0_const3.pk3', fpath_topo='10M_8_3.0_const3_topo.pk3'):
+                 fpath='../../data/10000_8_4.pk3', fpath_topo='../../data/10000_8_4_topo.pk3'):
         with open(fpath, 'rb') as f1:
             self.dataset = pk.load(f1)
         with open(fpath_topo, 'rb') as f2:

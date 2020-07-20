@@ -182,7 +182,7 @@ class TopoOperator(object):
                         v_i = self.solve(curr_graph, srcs[i], dsts[i], demand[srcs[i], dsts[i]])
                         v += np.array(v_i)
                     v /= len(srcs)
-                    print("v {}".format(v))
+                    #print("v {}".format(v))
                     if i_step < n_steps - 1:
                         new_graph = self.simulator.step_graph(self.max_node, v, 
                                                               demand=demand, 
@@ -194,7 +194,7 @@ class TopoOperator(object):
                                                    demand=demand, 
                                                    topology=dict2nxdict(self.max_node,curr_graph), 
                                                    allowed_degree=self.allowed_degree)
-                print("cost {}".format(cost))
+                print("[No {0}][alpha_v {1}][alpha_i {2}] [cost {3}]".format(no, alpha_v, alpha_i,cost))
                 cost_scans.append({'alpha_v':alpha_v,'alpha_i':alpha_i,'cost':cost})
         file_name = folder + 'alpha_cost_' + str(no) + '.pk'
         with open(file_name, 'wb') as f:
@@ -245,15 +245,18 @@ def dict2nxdict(n_node, dic):
 def main():
     # Set parameters
     start_no = args.start
-    n_node = 8
-    n_steps = 4
-    n_search = 125
+    n_node = 24
+    n_steps = 1
+    n_search = 100
     search_begin = 0
     search_end = 3
     search_num = 30
-    folder = './search_8nodes_4steps/'
-    file_demand_degree = './data/10000_8_4.pk3'
-    file_topo = './data/10000_8_4_topo.pk3'
+    folder = '../../search_records/search_geant2/'
+    file_demand_degree = '../../data/geant2/demand_100.pkl'
+    file_topo = '../../data/geant2/topology.pkl'
+    fixed_topo = True
+    mixed_dataset = False
+
     
     opr = TopoOperator(n_node)
     with open(file_demand_degree, 'rb') as f1:
@@ -261,10 +264,18 @@ def main():
     with open(file_topo, 'rb') as f2:
         topo_dataset = pk.load(f2)
     
+    if fixed_topo:
+        topo = topo_dataset
+
     for i in range(n_search):
         print("======== No {} =======".format(i+start_no))
-        demand = dataset[i+start_no]['demand']
-        topo = topo_dataset[i+start_no]
+        if mixed_dataset:
+            demand = dataset[i+start_no]['demand']
+        else:
+            demand = dataset[i+start_no]
+
+        if not fixed_topo:
+            topo = topo_dataset[i+start_no]
         graph = dict2dict(n_node,topo)
         opr.run_multistep(graph, demand, i+start_no, n_steps,
                           begin=search_begin,end=search_end,num=search_num,
