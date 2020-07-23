@@ -19,7 +19,7 @@ alpha_v = 1.2
 alpha_i = 0.1
 
 # parameters for supervised learning & reinforcement learning
-max_degree = 4
+Max_degree = 4
 dims = [3, 64, 1]
 model_name_sl = "../saved_model/model"
 model_name_rl = "../saved_model/gnn_ppo4topo1"
@@ -40,8 +40,8 @@ if data_source == "random":
 elif data_source == "nsfnet":
     node_num = 14
     n_iters = 100
-    file_demand_degree = '../data/geant2/demand_100.pkl'
-    file_topo = '../data/geant2/topology.pkl'
+    file_demand_degree = '../data/nsfnet/demand_100.pkl'
+    file_topo = '../data/nsfnet/topology.pkl'
 elif data_source == "geant2":
     node_num = 24
     n_iters = 100
@@ -107,6 +107,7 @@ def main():
             topo = dataset_topo[i_iter]
         else:
             demand = dataset[i_iter]
+            degree = Max_degree * np.ones((node_num,), dtype=np.float32)
             topo = dataset_topo
 
         print("************** iter {} **************".format(i_iter))
