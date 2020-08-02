@@ -73,7 +73,7 @@ class Demo_gui(object):
                 self.topo = pk.load(f2)[rand_num]
             self.rectCenters = self.calcRectCenters(topo_var)
             self.lines = self.drawLines()
-            self.rects = self.drawRectangles()
+            self.rects, self.rectTexts = self.drawRectangles()
         elif topo_var == "nsfnet":
             self.node_num = 14
             file_topo = '../data/nsfnet/topology.pkl'
@@ -81,7 +81,7 @@ class Demo_gui(object):
                 self.topo = pk.load(f2)
             self.rectCenters = self.calcRectCenters(topo_var)
             self.lines = self.drawLines()
-            self.rects = self.drawRectangles()
+            self.rects, self.rectTexts = self.drawRectangles()
         elif topo_var == "geant2":
             self.node_num = 24
             file_topo = '../data/geant2/topology.pkl'
@@ -89,7 +89,7 @@ class Demo_gui(object):
                 self.topo = pk.load(f2)
             self.rectCenters = self.calcRectCenters(topo_var)
             self.lines = self.drawLines()
-            self.rects = self.drawRectangles()
+            self.rects, self.rectTexts = self.drawRectangles()
         else:
             self.text.insert(tk.END,"Invalid dataset option: {}\n".format(topo_var))
             self.text.update()
@@ -137,7 +137,7 @@ class Demo_gui(object):
         v = self.operator.predict(self.topo, self.demand)
         v_norm = self.normalization(v)
         self.text.insert(tk.END, "potential vector: {}\n".format(v_norm))
-        act, rm_inds, new_topo = self.simulator.step_act(self.node_num, v, self.demand, self.topo, self.degree)
+        act, rm_inds, new_topo = self.simulator.step_act(self.node_num, v_norm, self.demand, self.topo, self.degree)
         if len(act) == 0:
             self.text.insert(tk.END,"No valid action.\n")
             self.text.update()
@@ -151,10 +151,10 @@ class Demo_gui(object):
 
     def normalization(self, v):
         v_pos = v - min(v)
-        if max(v) > 1e-7:
-            return v/max(v)
+        if max(v_pos) > 1e-7:
+            return v_pos/max(v_pos)
         else:
-            return (v+1e-7)/(max(v)+1e-7)
+            return (v_pos+1e-7)/(max(v_pos)+1e-7)
 
     def calcRectCenters(self, topo_var):
         """Compute the centers of the rectangles representing clients/routers"""
@@ -192,6 +192,7 @@ class Demo_gui(object):
     def drawRectangles(self):
         """draw rectangles corresponding to clients/routers"""
         rects = {}
+        rectTexts = {}
         fill = "DodgerBlue2"
         for label in self.rectCenters:
             c = self.rectCenters[label]
@@ -199,7 +200,8 @@ class Demo_gui(object):
                     c[0]+self.boxWidth/6, c[1]+self.boxHeight/6, fill=fill, activeoutline="green", activewidth=5)
             rects[label] = rect
             rectText = self.canvas.create_text(c[0], c[1], text=label, font=('consolas',18))
-        return rects
+            rectTexts[label] = rectText
+        return rects, rectText
 
 def main():
     print("Demo")
