@@ -7,7 +7,7 @@ import numpy as np
 import networkx as nx
 import pickle as pk
 
-from plotv import TopoSimulator
+from .plotv import TopoSimulator
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--start", type=int, default=0, help="the starting number for file naming")

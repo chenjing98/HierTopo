@@ -70,12 +70,14 @@ class GnnPolicy(ActorCriticPolicy):
             #graph_latent = self._egnn(self.processed_obs)
 
         with tf.variable_scope("model", reuse=reuse):
-
-            pi_latent, vf_latent = mlp_extractor(
-                tf.cond(tf.equal(tf.size(graph_latent), 0),
-                    lambda:tf.reshape(graph_latent,[-1,self.n_nodes]),
-                    lambda:tf.layers.flatten(graph_latent)),
-                net_arch, act_fun)
+            
+            pi_latent = graph_latent
+            _, vf_latent = mlp_extractor(self.processed_obs, net_arch, act_fun)
+            #pi_latent, vf_latent = mlp_extractor(
+            #    tf.cond(tf.equal(tf.size(graph_latent), 0),
+            #        lambda:tf.reshape(graph_latent,[-1,self.n_nodes]),
+            #        lambda:tf.layers.flatten(graph_latent)),
+            #    net_arch, act_fun)
 
             self._value_fn = linear(vf_latent, 'vf', 1)
 

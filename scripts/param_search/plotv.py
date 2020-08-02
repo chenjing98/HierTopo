@@ -23,15 +23,19 @@ def compute_reward(state, num_node, demand, degree):
 
 
 class TopoSimulator(object):
-    def __init__(self, n_node=8, 
+    def __init__(self, n_node=8, prepare_daraset=False,
                  fpath='../../data/10000_8_4.pk3', fpath_topo='../../data/10000_8_4_topo.pk3'):
-        with open(fpath, 'rb') as f1:
-            self.dataset = pk.load(f1)
-        with open(fpath_topo, 'rb') as f2:
-            self.toposet = pk.load(f2)
+        if prepare_daraset:
+            with open(fpath, 'rb') as f1:
+                self.dataset = pk.load(f1)
+            with open(fpath_topo, 'rb') as f2:
+                self.toposet = pk.load(f2)
 
         self.max_node = n_node
 
+    def reset(self, n_node):
+        self.max_node = n_node
+        
     def step(self, n_node, action, no=0, demand=None, topology=None, allowed_degree=None):
         """
         :param n_node: (int) number of nodes
@@ -167,6 +171,72 @@ class TopoSimulator(object):
                 self._add_edge(rm_ind)
         
         return nx.to_dict_of_dicts(self.graph)
+
+    def step_act(self, n_node, action, demand=None, topology=None, allowed_degree=None):
+        """
+        :param n_node: (int) number of nodes
+        :param action: (nparray) v
+        :param demand: (nparray)
+        :param topology: (nxdict)
+        :param allowed_degree: (nparray)
+        :return: new_graph: (nxdict)
+        """
+        self.demand = demand
+        self.allowed_degree = allowed_degree
+        topo = topology
+        self.graph = nx.from_dict_of_dicts(topo)
+        degree_inuse = np.array(self.graph.degree)[:,-1]
+        self.available_degree = self.allowed_degree - degree_inuse
+        Bmat = np.zeros((n_node,n_node),np.float32)
+        for i in range(n_node):
+            for j in range(i+1,n_node):
+                deltav = np.abs(action[i]-action[j])
+                Bmat[i,j] = deltav
+                Bmat[j,i] = deltav
+        self._graph2Pvec(Bmat) #
+        obj = Bmat - np.tile(self.Pvec,(n_node,1)) - np.tile(self.Pvec.reshape(n_node,1),(1,n_node))
+        adj = np.array(nx.adjacency_matrix(self.graph).todense(), np.float32)
+        for i in range(n_node):
+            adj[i,i] = 1
+        masked_obj = (adj==0)*obj
+        ind_x, ind_y = np.where(masked_obj==np.max(masked_obj))
+        if len(ind_x) < 1:
+            raise ValueError
+        elif len(ind_x) > 1:
+            s = random.randint(0, len(ind_x)-1)
+            add_ind = [ind_x[s], ind_y[s]]
+        else:
+            add_ind = [ind_x[0], ind_y[0]]
+
+        # Check if both nodes have available degree
+        v1 = add_ind[0]
+        v2 = add_ind[1]
+        rm_inds = []
+        succeed = False
+        if not self._check_degree(v1):
+            neighbors = [n for n in self.graph.neighbors(v1)]
+            h_neightbor = [Bmat[v1,n] for n in neighbors]
+            v_n = neighbors[h_neightbor.index(min(h_neightbor))]
+            rm_ind = [v_n,v1] if v_n<v1 else [v1,v_n]
+            if self._check_connectivity(rm_ind):
+                self._remove_edge(rm_ind)
+                rm_inds.append(rm_ind)
+        if not self._check_degree(v2):
+            neighbors = [n for n in self.graph.neighbors(v2)]
+            h_neightbor = [Bmat[v2,n] for n in neighbors]
+            v_n = neighbors[h_neightbor.index(min(h_neightbor))]
+            rm_ind = [v_n,v2] if v_n<v2 else [v2,v_n]
+            if self._check_connectivity(rm_ind):
+                self._remove_edge(rm_ind)
+                rm_inds.append(rm_ind)
+        if self._check_validity(add_ind):
+            self._add_edge(add_ind)
+            succeed = True
+        else:
+            for rm_ind in rm_inds:
+                self._add_edge(rm_ind)
+        act = add_ind if succeed else []
+        return act, rm_inds, nx.to_dict_of_dicts(self.graph)
 
 
     def _add_edge(self, action):

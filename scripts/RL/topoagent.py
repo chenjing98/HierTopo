@@ -34,7 +34,7 @@ def main():
     if HAS_PRETRAINED:
         model = PPO2.load(pretrain_model_name, vec_env)
     else:
-        model = PPO2(GnnPolicy, vec_env ,verbose=1, tensorboard_log=TENSORBOARD_LOG_DIR)
+        model = PPO2(GnnPolicy, vec_env ,verbose=1, tensorboard_log=TENSORBOARD_LOG_DIR, cliprange_vf=50.0)
 
     print("Model built.")
     model.learn(total_timesteps=TRAINSTEPS)
