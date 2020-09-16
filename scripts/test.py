@@ -10,29 +10,31 @@ from whatisoptimal import optimal
 from param_search.OptSearch import TopoOperator, dict2dict, dict2nxdict
 from param_search.plotv import TopoSimulator
 
-schemes = ["optimal", "weighted-matching"] # options: "optimal", "weighted-matching", "egotree", "param-search", "rl"
-data_source = "nsfnet" # options: "random", "nsfnet", "geant2"
-n_steps = 1
+methods = ["optimal"] # options: "optimal", "weighted-matching", "egotree", "param-search", "rl"
+data_source = "scratch" # options: "random8", "nsfnet", "geant2", "scratch"
+scheme = "complete" # options: "complete", "bysteps"
+Max_degree = 4
+n_steps = 2
+n_nodes = 8
 
 # parameters for "search"
 alpha_v = 1.2
 alpha_i = 0.1
 
 # parameters for supervised learning & reinforcement learning
-Max_degree = 4
 dims = [3, 64, 1]
 model_name_sl = "../saved_model/model"
 model_name_rl = "../saved_model/gnn_ppo4topo1"
 
-if "rl" in schemes:
+if "rl" in methods:
     from stable_baselines import PPO2
-if "sl" in schemes:
+if "sl" in methods:
     import tensorflow as tf
     from SL.SLmodel import supervisedModel
-if "rl" in schemes or "sl" in schemes:
+if "rl" in methods or "sl" in methods:
     from RL.topoenv_backup import TopoEnv
 
-if data_source == "random":
+if data_source == "random8":
     node_num = 8
     n_iters = 1000
     file_demand_degree = '../data/10000_8_4_test.pk3'
@@ -47,6 +49,15 @@ elif data_source == "geant2":
     n_iters = 100
     file_demand_degree = '../data/geant2/demand_100.pkl'
     file_topo = '../data/geant2/topology.pkl'
+elif data_source == "germany":
+    node_num = 50
+    n_iters = 100
+    file_demand_degree = '../data/germany/demand_100.pkl'
+    file_topo = '../data/germany/topology.pkl'
+elif data_source == "scratch":
+    node_num = n_nodes
+    n_iters = 10000
+    file_demand = '../data/10000_{0}_{1}_logistic.pk3'.format(n_nodes, Max_degree)
 else:
     print("data_source {} unrecognized.".format(data_source))
     exit(1)
@@ -64,7 +75,7 @@ def compute_reward(state, num_node, demand, degree):
         cost += path_length * demand[s,d]   
 
     cost /= (sum(sum(demand)))   
-    return cost 
+    return cost
 
 def main():
     costs_opt = []
@@ -74,18 +85,18 @@ def main():
     costs_rl = []
 
     # initialize models
-    if "weighted-matching" in schemes:
+    if "weighted-matching" in methods:
         permatch_model = permatch(node_num)
-    if "optimal" in schemes:
+    if "optimal" in methods:
         opt = optimal()
-    if "param-search" in schemes:
+    if "param-search" in methods:
         opr = TopoOperator(node_num)
         opr.reset(alpha_v,alpha_i)
         sim = TopoSimulator(n_node=node_num)
-    if "rl" in schemes:
+    if "rl" in methods:
         policy = PPO2.load(model_name_rl)
         env = TopoEnv(node_num)
-    #if "sl" in schemes:
+    #if "sl" in methods:
     #    sess = tf.Session()
     #    model = supervisedModel(sess, node_num, 4, [3,64,1])
     #    ckpt = tf.train.get_checkpoint_state(model_name_sl)
@@ -101,10 +112,12 @@ def main():
 
     # start testing
     for i_iter in range(n_iters):
-        if data_source == "random":
+        if data_source == "random8":
             demand = dataset[i_iter]['demand']
             degree = dataset[i_iter]['allowed_degree']
             topo = dataset_topo[i_iter]
+        elif data_source == "scratch":
+            demand = dataset[i_iter]
         else:
             demand = dataset[i_iter]
             degree = Max_degree * np.ones((node_num,), dtype=np.float32)
@@ -112,7 +125,7 @@ def main():
 
         print("************** iter {} **************".format(i_iter))
 
-        if "egotree" in schemes:
+        if "egotree" in methods:
             int_degree = degree.astype(int) 
             max_degree = int(max(degree))
             test_e = ego_tree_unit(demand,node_num,int_degree,max_degree)
@@ -123,7 +136,7 @@ def main():
             costs_ego.append(cost_e)
             print("egotree: {}".format(cost_e))
 
-        if "optimal" in schemes:
+        if "optimal" in methods:
             _, opt_dict = opt.multistep_DFS(node_num,topo,demand,degree,n_steps)
             opt_graph = nx.from_dict_of_dicts(opt_dict)
             state_o = np.array(nx.adjacency_matrix(opt_graph).todense(), np.float32)
@@ -132,7 +145,7 @@ def main():
             print("optimal: {}".format(cost_o))
             #v_optimal = opt.consturct_v(best_action,neigh)
 
-        if "weighted-matching" in schemes:
+        if "weighted-matching" in methods:
             origin_graph = nx.from_dict_of_dicts(topo)
             permatch_new_graph = permatch_model.n_steps_matching(
                     demand,origin_graph,degree,n_steps)
@@ -141,7 +154,7 @@ def main():
             costs_match.append(cost_m)
             print("weighted_matching: {}".format(cost_m))
 
-        if "param-search" in schemes:
+        if "param-search" in methods:
             curr_graph = topo
             for i_step in range(n_steps):
                 v = opr.predict(curr_graph, demand)
@@ -158,7 +171,7 @@ def main():
             costs_search.append(cost_s)
             print("search: {}".format(cost_s))
 
-        if "rl" in schemes:
+        if "rl" in methods:
             obs = env.reset(demand=demand,degree=degree,provide=True)
             for _ in range(n_steps):
                 action, _ = policy.predict(obs)
@@ -213,17 +226,17 @@ def main():
         #state_h = np.array(nx.adjacency_matrix(graph).todense(),dtype=np.float32)
         #cost_h = compute_reward(state_h, node_num, demand, degree)
 
-        
+    print("Setting:\ndata source = {0}\nn_steps     = {1}".format(data_source, n_steps))
     print("============= Avg_costs ({} step(s)) =============".format(n_steps))
-    if "optimal" in schemes:
+    if "optimal" in methods:
         print("optimal: {}".format(np.mean(costs_opt)))
-    if "weighted-matching" in schemes:
+    if "weighted-matching" in methods:
         print("weighted-matching: {}".format(np.mean(costs_match)))
-    if "egotree" in schemes:
+    if "egotree" in methods:
         print("egotree: {}".format(np.mean(costs_ego)))
-    if "param-search" in schemes:
+    if "param-search" in methods:
         print("search: {}".format(np.mean(costs_search)))
-    if "rl" in schemes:
+    if "rl" in methods:
         print("RL: {}".format(np.mean(costs_rl)))
     
     
