@@ -6,7 +6,7 @@ import pygad
 import pickle as pk
 import itertools
 import random
-import multiprocessing
+from multiprocessing import Pool
 
 """
 Given the following function:
@@ -14,12 +14,12 @@ Given the following function:
     where y gets its minimum
 What are the best values for the weights (alpha)?
 """
-k = 6
+k = 8
 n_iters = 3
 n_steps = 4
 #degree_lim = 8
-parallelism = 10
-data_source = "random"
+n_workers = 10
+data_source = "germany"
 
 if data_source == "random":
     node_num = 8
@@ -39,11 +39,17 @@ elif data_source == "geant2":
     n_testings = 100
     file_demand_degree = '../../data/geant2/demand_100.pkl'
     file_topo = '../../data/geant2/topology.pkl'
+elif data_source == "germany":
+    node_num = 50
+    degree_lim = 8
+    n_testings = 100
+    file_demand_degree = '../../data/germany/demand_100.pkl'
+    file_topo = '../../data/germany/topology.pkl'
 else:
     print("data_source {} unrecognized.".format(data_source))
     exit(1)
 
-print("Settings:\ndata source = {0}\nn_steps     = {1}\nn_iters     = {2}\nparallelism = {3}".format(data_source,n_steps,n_iters,parallelism))
+print("Settings:\ndata source = {0}\nn_steps     = {1}\nn_iters     = {2}\nparallelism = {3}".format(data_source,n_steps,n_iters,n_workers))
 
 desired_output = 0.99 # Function output.
 
@@ -135,6 +141,7 @@ def cal_pathlength(demand, graph):
     score /= (sum(sum(demand)))
     return score
 
+"""
 def test(solution, test_size):
     metrics = []
     q = multiprocessing.Queue()
@@ -168,6 +175,33 @@ def test_run(lock, queue, solution, test_size, process_no):
     lock.acquire()
     queue.put(m_tmp)
     lock.release()
+"""
+
+
+def test(solution, test_size):
+    params = []
+    for i in range(test_size):
+        if data_source == 'random':
+            demand = dataset[i]['demand']
+            topo = dataset_topo[i]
+        else:
+            demand = dataset[i]
+            topo = dataset_topo
+        param = {'solution': solution, 'demand': demand, 'topo': topo}
+        params.append(param)
+    pool = Pool(n_workers)
+    metrics = pool.map(test_run, params)
+    pool.close()
+    pool.join()
+    output = np.mean(np.array(metrics))
+    return output
+
+def test_run(param):
+    solution = param['solution']
+    demand = param['demand']
+    topo = param['topo']
+    m = apply_policy_robust(demand, topo, solution)
+    return m
 
 def apply_policy_robust(demand, topo, alpha):
     """
@@ -241,7 +275,7 @@ def fitness_func(solution, solution_idx):
 
 fitness_function = fitness_func
 
-num_generations = 200 # Number of generations.
+num_generations = 100 # Number of generations.
 num_parents_mating = 7 # Number of solutions to be selected as parents in the mating pool.
 
 # To prepare the initial population, there are 2 ways:
@@ -291,7 +325,7 @@ ga_instance.run()
 # After the generations complete, some plots are showed that summarize the how the outputs/fitenss values evolve over generations.
 #ga_instance.plot_result()
 
-print("Settings:\ndata source = {0}\nn_steps     = {1}\nn_iters     = {2}\nn_orders    = {3}\nparallelism = {4}".format(data_source,n_steps,n_iters,k,parallelism))
+print("Settings:\ndata source = {0}\nn_steps     = {1}\nn_iters     = {2}\nn_orders    = {3}\nparallelism = {4}".format(data_source,n_steps,n_iters,k,n_workers))
 
 # Returning the details of the best solution.
 solution, solution_fitness, solution_idx = ga_instance.best_solution()
