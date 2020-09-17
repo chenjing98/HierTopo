@@ -3,14 +3,16 @@ import itertools
 import numpy as np
 import networkx as nx
 import pickle as pk
+from timeit import default_timer as timer
 
 from baseline.ego_tree import ego_tree_unit
 from baseline.permatch import permatch
 from whatisoptimal import optimal
 from param_search.OptSearch import TopoOperator, dict2dict, dict2nxdict
 from param_search.plotv import TopoSimulator
+from baseline.bmatching import bMatching
 
-methods = ["optimal"] # options: "optimal", "weighted-matching", "egotree", "param-search", "rl"
+methods = ["bmatch"] # options: "optimal", "greedy", "egotree", "param-search", "rl", "bmatch"
 data_source = "scratch" # options: "random8", "nsfnet", "geant2", "scratch"
 scheme = "complete" # options: "complete", "bysteps"
 Max_degree = 4
@@ -83,9 +85,11 @@ def main():
     costs_match = []
     costs_search = []
     costs_rl = []
+    costs_b = []
 
+    t_begin = timer()
     # initialize models
-    if "weighted-matching" in methods:
+    if "greedy" in methods:
         permatch_model = permatch(node_num)
     if "optimal" in methods:
         opt = optimal()
@@ -96,6 +100,8 @@ def main():
     if "rl" in methods:
         policy = PPO2.load(model_name_rl)
         env = TopoEnv(node_num)
+    if "bmatch" in methods:
+        bmatch = bMatching(node_num, Max_degree)
     #if "sl" in methods:
     #    sess = tf.Session()
     #    model = supervisedModel(sess, node_num, 4, [3,64,1])
@@ -105,10 +111,14 @@ def main():
     #    env = TopoEnv(node_num)
 
     # load dataset
-    with open(file_demand_degree, 'rb') as f1:
-        dataset = pk.load(f1)
-    with open(file_topo, 'rb') as f2:
-        dataset_topo = pk.load(f2)
+    if data_source == "scratch":
+        with open(file_demand, 'rb') as f:
+            dataset = pk.load(f)
+    else: 
+        with open(file_demand_degree, 'rb') as f1:
+            dataset = pk.load(f1)
+        with open(file_topo, 'rb') as f2:
+            dataset_topo = pk.load(f2)
 
     # start testing
     for i_iter in range(n_iters):
@@ -118,6 +128,7 @@ def main():
             topo = dataset_topo[i_iter]
         elif data_source == "scratch":
             demand = dataset[i_iter]
+            degree = Max_degree * np.ones((node_num,), dtype=np.float32)
         else:
             demand = dataset[i_iter]
             degree = Max_degree * np.ones((node_num,), dtype=np.float32)
@@ -127,32 +138,46 @@ def main():
 
         if "egotree" in methods:
             int_degree = degree.astype(int) 
-            max_degree = int(max(degree))
-            test_e = ego_tree_unit(demand,node_num,int_degree,max_degree)
+            test_e = ego_tree_unit(demand,node_num,int_degree,Max_degree)
             test_e.create_tree()
             test_e.change_insert()
             state_e, _ = test_e.estab()
             cost_e = compute_reward(state_e, node_num, demand, degree)
             costs_ego.append(cost_e)
             print("egotree: {}".format(cost_e))
+        
+        if "bmatch" in methods:
+            state_b = bmatch.match(demand)
+            cost_b = compute_reward(state_b, node_num, demand, degree)
+            costs_b.append(cost_b)
+            print("bmatching: {}".format(cost_b))
 
         if "optimal" in methods:
-            _, opt_dict = opt.multistep_DFS(node_num,topo,demand,degree,n_steps)
-            opt_graph = nx.from_dict_of_dicts(opt_dict)
-            state_o = np.array(nx.adjacency_matrix(opt_graph).todense(), np.float32)
-            cost_o = compute_reward(state_o, node_num, demand, degree)
-            costs_opt.append(cost_o)
-            print("optimal: {}".format(cost_o))
-            #v_optimal = opt.consturct_v(best_action,neigh)
+            if scheme == "bysteps":
+                _, opt_dict = opt.multistep_DFS(node_num,topo,demand,degree,n_steps)
+                opt_graph = nx.from_dict_of_dicts(opt_dict)
+                state_o = np.array(nx.adjacency_matrix(opt_graph).todense(), np.float32)
+                cost_o = compute_reward(state_o, node_num, demand, degree)
+                costs_opt.append(cost_o)
+                print("optimal: {}".format(cost_o))
+                #v_optimal = opt.consturct_v(best_action,neigh)
+            if scheme == "complete":
+                cost, _ = opt.optimal_topology(node_num, demand, degree)
+                cost_o = cost/(sum(sum(demand)))   
+                costs_opt.append(cost_o)
+                print("optimal: {}".format(cost_o))
 
-        if "weighted-matching" in methods:
-            origin_graph = nx.from_dict_of_dicts(topo)
-            permatch_new_graph = permatch_model.n_steps_matching(
-                    demand,origin_graph,degree,n_steps)
-            state_m = np.array(nx.adjacency_matrix(permatch_new_graph).todense(), np.float32)
+        if "greedy" in methods:
+            if scheme == "bysteps":
+                origin_graph = nx.from_dict_of_dicts(topo)
+                permatch_new_graph = permatch_model.n_steps_matching(
+                        demand,origin_graph,degree,n_steps)
+                state_m = np.array(nx.adjacency_matrix(permatch_new_graph).todense(), np.float32)
+            if scheme == "complete":
+                state_m = permatch_model.matching(demand,degree)
             cost_m = compute_reward(state_m, node_num, demand, degree)
             costs_match.append(cost_m)
-            print("weighted_matching: {}".format(cost_m))
+            print("greedy: {}".format(cost_m))
 
         if "param-search" in methods:
             curr_graph = topo
@@ -192,22 +217,12 @@ def main():
         #costs_sl.append(cost_sl)
         #print("SL: {}".format(cost_sl))
 
-        ## test per-match
-        #state_m = permatch_model.matching(demand,degree)
-        #cost_m = compute_reward(state_m, node_num, demand, degree, 100)
-        #costs_match.append(cost_m)
-
         ## optimal (1 step)
         #origin_graph = nx.from_dict_of_dicts(topo)
         #best_action,neigh,opt_graph = opt.compute_optimal(node_num,origin_graph,demand,degree)
         #state_o1 = np.array(nx.adjacency_matrix(opt_graph).todense(), np.float32)
         #cost_o1 = compute_reward(state_o1, node_num, demand, degree, 100)
         #opt_dict = opt.multistep_compute_optimal(node_num,topo,demand,degree,n_steps)
-
-        ## optimal overall (not limited by n_steps)
-        #cost, _ = opt.optimal_topology(node_num, demand, degree)
-        #cost_o_best = cost/(sum(sum(demand)))   
-        #cost_opt_best.append(cost_o_best)
 
         ## parameter search (1 step)
         #v_weightedsum = opr.predict(topo,demand)
@@ -226,18 +241,27 @@ def main():
         #state_h = np.array(nx.adjacency_matrix(graph).todense(),dtype=np.float32)
         #cost_h = compute_reward(state_h, node_num, demand, degree)
 
-    print("Setting:\ndata source = {0}\nn_steps     = {1}".format(data_source, n_steps))
-    print("============= Avg_costs ({} step(s)) =============".format(n_steps))
+    t_end = timer()
+
+    print("Setting:\ndata source = {0}\nn_nodes     = {1}".format(data_source, node_num))
+    if scheme == "bysteps":
+        print("======== Avg_costs & std ({} step(s)) ========".format(n_steps))
+    elif scheme == "complete":
+        print("========== Avg_costs & std (compl) ===========")
+    
     if "optimal" in methods:
-        print("optimal: {}".format(np.mean(costs_opt)))
-    if "weighted-matching" in methods:
-        print("weighted-matching: {}".format(np.mean(costs_match)))
+        print("optimal : {0}  std : {1}".format(np.mean(costs_opt),np.std(costs_opt)))
+    if "greedy" in methods:
+        print("greedy  : {0}  std : {1}".format(np.mean(costs_match),np.std(costs_match)))
     if "egotree" in methods:
-        print("egotree: {}".format(np.mean(costs_ego)))
+        print("egotree : {0}  std : {1}".format(np.mean(costs_ego),np.std(costs_ego)))
+    if "bmatch" in methods:
+        print("b-match : {0}  std : {1}".format(np.mean(costs_b),np.std(costs_b)))
     if "param-search" in methods:
-        print("search: {}".format(np.mean(costs_search)))
+        print("search  : {0}  std : {1}".format(np.mean(costs_search),np.std(costs_search)))
     if "rl" in methods:
-        print("RL: {}".format(np.mean(costs_rl)))
+        print("RL      : {0}  std : {1}".format(np.mean(costs_rl),np.std(costs_rl)))
+    print("testing time : {} s".format(t_end-t_begin))
     
     
 

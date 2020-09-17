@@ -4,7 +4,7 @@ import math
 
 data_count = 10000
 dataset = []
-num_nodes = 8
+num_nodes = 10
 max_degree = 4
 distribution = 'logistic'
 file_name = '../../data/{0}_{1}_{2}_{3}.pk3'.format(data_count, num_nodes, max_degree, distribution)

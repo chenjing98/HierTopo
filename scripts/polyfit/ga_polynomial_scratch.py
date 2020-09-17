@@ -21,7 +21,7 @@ n_workers = 12
 node_num = 8
 n_testings = 1000
 
-file_demand = '../../data/10000_8_4_logistic.pk3'
+file_demand = '../../data/10000_{0}_{1}_logistic.pk3'.format(node_num, degree_lim)
 
 print("Settings:\nn_nodes     = {0}\nn_order     = {1}\nn_iters     = {2}\nn_testings  = {3}\nparallelism = {4}".format(node_num, k, n_iters,n_testings,n_workers))
 
@@ -40,7 +40,7 @@ def apply_policy(demand, topo, alpha):
     
     path_length = 0
     # normalize demand
-    x = demand/np.max(demand)*2
+    x = demand/np.max(demand)*2 - 1
 
     graph = nx.from_dict_of_dicts(topo)
     adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
@@ -53,7 +53,11 @@ def apply_policy(demand, topo, alpha):
             weighing_neigh = np.matmul(exp_x, alpha[(2*i+1)*k:(2*i+2)*k])
             neighbor_aggr = np.matmul(weighing_neigh, adj)
             g = weighing_self + neighbor_aggr
-            x = g/np.max(g)*2 # N x N
+            #x = g/np.max(g)*2 # N x N
+            z = np.zeros_like(g)
+            gpos = np.where(g>=0,g,z)
+            gneg = np.where(g<0,g,z)
+            x = 1/(1+np.exp(-gpos)) + np.exp(gneg)/(1+np.exp(gneg)) - 1/2
         
         v = np.sum(x, axis=0)
         dif = cal_diff(v)
@@ -179,7 +183,7 @@ def apply_policy_robust(demand, alpha):
     
     path_length = 0
     # normalize demand
-    x = demand/np.max(demand)*2
+    x = demand/np.max(demand)*2 - 1
 
     n_nodes = node_num
     graph = nx.Graph()
@@ -194,7 +198,11 @@ def apply_policy_robust(demand, alpha):
             weighing_neigh = np.matmul(exp_x, alpha[k:2*k])
             neighbor_aggr = np.matmul(weighing_neigh, adj)
             g = weighing_self + neighbor_aggr
-            x = g/np.max(g)*2 # N x N
+            #x = g/np.max(g)*2 # N x N
+            z = np.zeros_like(g)
+            gpos = np.where(g>=0,g,z)
+            gneg = np.where(g<0,g,z)
+            x = 1/(1+np.exp(-gpos)) + np.exp(gneg)/(1+np.exp(gneg)) - 1/2
         
         v = np.sum(x, axis=0)
         dif = cal_diff(v)
