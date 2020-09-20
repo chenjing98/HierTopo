@@ -12,12 +12,12 @@ from param_search.OptSearch import TopoOperator, dict2dict, dict2nxdict
 from param_search.plotv import TopoSimulator
 from baseline.bmatching import bMatching
 
-methods = ["bmatch"] # options: "optimal", "greedy", "egotree", "param-search", "rl", "bmatch"
+methods = ["egotree"] # options: "optimal", "greedy", "egotree", "param-search", "rl", "bmatch"
 data_source = "scratch" # options: "random8", "nsfnet", "geant2", "scratch"
 scheme = "complete" # options: "complete", "bysteps"
 Max_degree = 4
 n_steps = 2
-n_nodes = 8
+n_nodes = 10
 
 # parameters for "search"
 alpha_v = 1.2
@@ -58,7 +58,7 @@ elif data_source == "germany":
     file_topo = '../data/germany/topology.pkl'
 elif data_source == "scratch":
     node_num = n_nodes
-    n_iters = 10000
+    n_iters = 1000
     file_demand = '../data/10000_{0}_{1}_logistic.pk3'.format(n_nodes, Max_degree)
 else:
     print("data_source {} unrecognized.".format(data_source))
@@ -134,7 +134,7 @@ def main():
             degree = Max_degree * np.ones((node_num,), dtype=np.float32)
             topo = dataset_topo
 
-        print("************** iter {} **************".format(i_iter))
+        print("[iter {}]".format(i_iter))
 
         if "egotree" in methods:
             int_degree = degree.astype(int) 
@@ -142,13 +142,14 @@ def main():
             test_e.create_tree()
             test_e.change_insert()
             state_e, _ = test_e.estab()
+            print("adj: {}".format(state_e))
             cost_e = compute_reward(state_e, node_num, demand, degree)
             costs_ego.append(cost_e)
             print("egotree: {}".format(cost_e))
         
         if "bmatch" in methods:
-            state_b = bmatch.match(demand)
-            cost_b = compute_reward(state_b, node_num, demand, degree)
+            cost_b = bmatch.match(demand)
+            #cost_b = compute_reward(state_b, node_num, demand, degree)
             costs_b.append(cost_b)
             print("bmatching: {}".format(cost_b))
 

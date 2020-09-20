@@ -18,7 +18,7 @@ k = 8
 n_iters = 3
 degree_lim = 4
 n_workers = 12
-node_num = 8
+node_num = 12
 n_testings = 1000
 
 file_demand = '../../data/10000_{0}_{1}_logistic.pk3'.format(node_num, degree_lim)

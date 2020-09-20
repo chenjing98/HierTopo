@@ -18,7 +18,7 @@ class ego_tree_unit(object):
         self.ego_tree = np.zeros((math.ceil(node_num/2),max_degree+1,node_num))
         for i in range(math.ceil(node_num/2)):
             for j in range(max_degree+1):
-                for k in range(node_num):
+                for _ in range(node_num):
                     self.ego_tree[i,j] = -np.inf
         self.high = np.argsort(self.degree)[math.ceil(node_num/2):node_num]
         self.low = np.argsort(self.degree)[0:math.ceil(node_num/2)]

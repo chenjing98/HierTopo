@@ -6,8 +6,9 @@ import networkx as nx
 data_count = 10000
 dataset = []
 num_nodes = 8
-allowed_degree = np.ones(num_nodes) * 4
-file_name = '10000_8_4_topo_test.pk3'
+max_degree = 4
+allowed_degree = np.ones(num_nodes) * max_degree
+file_name = '../../data/traindata/{0}_{1}_{2}_topo_train.pk3'.format(data_count, num_nodes, max_degree)
 
 def random_topology_generator(num_node, allowed_degree, tries=5):
     p = np.random.randn()
