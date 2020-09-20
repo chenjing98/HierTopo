@@ -4,11 +4,12 @@ import math
 
 # Set parameters
 data_count = 10000
-dataset = []
 num_nodes = 15
 max_degree = 4
 distribution = 'logistic'
 file_name = '../../data/traindata/{0}_{1}_{2}_{3}.pk3'.format(data_count, num_nodes, max_degree, distribution)
+
+dataset = []
 
 def poisson_demand():
     allowed_degree = np.ones(num_nodes) * max_degree
