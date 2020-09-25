@@ -8,6 +8,7 @@ import itertools
 import random
 from multiprocessing import Pool
 from timeit import default_timer as timer
+from permatch import permatch
 
 """
 Given the following function:
@@ -15,18 +16,21 @@ Given the following function:
     where y gets its minimum
 What are the best values for the weights (alpha)?
 """
-k = 2
+k = 3
 n_iters = 3
 degree_lim = 4
 n_workers = 12
 node_num = 8
 n_testings = 1000
 max_steps = int(node_num*degree_lim/2)
+max_adjust_steps = 10
 
 file_demand = '../../data/10000_{0}_{1}_logistic.pk3'.format(node_num, degree_lim)
 file_logging = '../../poly_log/log{0}_{1}_{2}_{3}.pkl'.format(node_num,degree_lim,k,n_iters)
 
 print("Settings:\nn_nodes     = {0}\nn_order     = {1}\nn_iters     = {2}\nn_testings  = {3}\nparallelism = {4}".format(node_num, k, n_iters,n_testings,n_workers))
+
+permatch_model = permatch(node_num)
 
 desired_output = 0.99 # Function output.
 
@@ -40,10 +44,6 @@ def apply_policy(demand, alpha):
     :param alpha: (np.array) N
     :return: metric: (np.float32) average shortest path length
     """
-    
-    path_length = 0
-    # normalize demand
-    #x = demand/np.max(demand)*2 - 1
 
     n_nodes = node_num
     graph = nx.Graph()
@@ -51,10 +51,11 @@ def apply_policy(demand, alpha):
     adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
     degree = np.sum(adj, axis=-1)
 
-    z = np.zeros((n_nodes,), np.float32)
-    for s in range(max_steps):
+    z = np.zeros((n_nodes,n_nodes), np.float32)
+    for _ in range(max_steps):
         #x = np.sum(demand, axis=0)
         x = demand/np.max(demand)*2 - 1 # [N]
+        x = x.T
         for i in range(n_iters):
             exp_x = expand_orders_mat(x)
             weighing_self = np.matmul(exp_x, alpha[2*i*k:(2*i+1)*k])
@@ -66,24 +67,23 @@ def apply_policy(demand, alpha):
             gneg = np.where(g<0,g,z)
             x = 1/(1+np.exp(-gpos)) + np.exp(gneg)/(1+np.exp(gneg)) - 1/2
         
-        #v = np.sum(x, axis=0)
-        v = x
-        dif = cal_diff(v)
+        v = np.sum(x, axis=0)
+        dif = cal_diff(v) + 1.0
         degree_full = np.where(degree>=degree_lim, 1.0, 0.0)
         degree_mask = np.repeat(np.expand_dims(degree_full,0),n_nodes,0) + np.repeat(np.expand_dims(degree_full,-1),n_nodes,-1)
         mask = adj + np.identity(n_nodes, np.float32) + degree_mask
-        masked_dif = (mask == 0) * dif
+        masked_dif = (mask == 0) * dif - 1.0
         ind_x, ind_y = np.where(masked_dif==np.max(masked_dif))
         #ind_x, ind_y = np.where(dif==np.max(dif))
         if len(ind_x) < 1:
             continue
         elif len(ind_x) > 1:
-            s = random.randint(0, len(ind_x)-1)
-            add_ind = (ind_x[s], ind_y[s])
+            j = random.randint(0, len(ind_x)-1)
+            add_ind = (ind_x[j], ind_y[j])
         else:
             add_ind = (ind_x[0], ind_y[0])
 
-        if (adj[add_ind] != 1) and (degree[add_ind[0]] < degree_lim) and (degree[add_ind[0]] < degree_lim):
+        if (adj[add_ind] != 1) and (degree[add_ind[0]] < degree_lim) and (degree[add_ind[1]] < degree_lim):
             graph.add_edge(add_ind[0], add_ind[1])
             adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
             degree = np.sum(adj, axis=-1)
@@ -97,21 +97,19 @@ def apply_policy_replace(demand, alpha):
     :param alpha: (np.array) N
     :return: metric: (np.float32) average shortest path length
     """
-    
-    path_length = 0
-    # normalize demand
-    #x = demand/np.max(demand)*2 - 1
 
     n_nodes = node_num
-    graph = nx.Graph()
-    graph.add_nodes_from(list(range(n_nodes)))
-    adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
+    #graph = nx.Graph()
+    #graph.add_nodes_from(list(range(n_nodes)))
+    #adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
+    adj = permatch_model.matching(demand, np.ones((node_num,)) * (degree_lim-1))
+    graph = nx.from_numpy_matrix(adj)
     degree = np.sum(adj, axis=-1)
 
-    z = np.zeros((n_nodes,), np.float32)
-    for s in range(max_steps):
-        #x = np.sum(demand, axis=0)
-        x = x/np.max(demand)*2 - 1 # [N]
+    z = np.zeros((n_nodes,n_nodes), np.float32)
+    for s in range(max_adjust_steps):
+        x = demand/np.max(demand)*2 - 1 # [N]
+        x = x.T
         for i in range(n_iters):
             exp_x = expand_orders_mat(x)
             weighing_self = np.matmul(exp_x, alpha[2*i*k:(2*i+1)*k])
@@ -119,32 +117,61 @@ def apply_policy_replace(demand, alpha):
             neighbor_aggr = np.matmul(weighing_neigh, adj)
             g = weighing_self + neighbor_aggr
             #x = g/np.max(g)*2 # N x N
-            #z = np.zeros_like(g)
             gpos = np.where(g>=0,g,z)
             gneg = np.where(g<0,g,z)
             x = 1/(1+np.exp(-gpos)) + np.exp(gneg)/(1+np.exp(gneg)) - 1/2
         
-        #v = np.sum(x, axis=0)
-        v = x
-        dif = cal_diff(v)
-        degree_full = np.where(degree>=degree_lim, 1.0, 0.0)
-        degree_mask = np.repeat(np.expand_dims(degree_full,0),n_nodes,0) + np.repeat(np.expand_dims(degree_full,-1),n_nodes,-1)
-        mask = adj + np.identity(n_nodes, np.float32) + degree_mask
-        masked_dif = (mask == 0) * dif
+        v = np.sum(x, axis=0)
+        dif = cal_diff(v) + 1.0
+        mask = adj + np.identity(n_nodes, np.float32)
+        masked_dif = (mask == 0) * dif - 1.0
         ind_x, ind_y = np.where(masked_dif==np.max(masked_dif))
-        #ind_x, ind_y = np.where(dif==np.max(dif))
         if len(ind_x) < 1:
             continue
         elif len(ind_x) > 1:
-            s = random.randint(0, len(ind_x)-1)
-            add_ind = (ind_x[s], ind_y[s])
+            j = random.randint(0, len(ind_x)-1)
+            add_ind = (ind_x[j], ind_y[j])
         else:
             add_ind = (ind_x[0], ind_y[0])
+        #if add_ind[0] == add_ind[1] or adj[add_ind] == 1:
+        #    print("wrong in the find")
 
-        if (adj[add_ind] != 1) and (degree[add_ind[0]] < degree_lim) and (degree[add_ind[0]] < degree_lim):
+        rm_inds = []
+
+        loss = 0
+        if (degree[add_ind[0]] >= degree_lim):
+            dif_at_n0 = np.max(dif) + 1.0 - dif[add_ind[0]]
+            dif_n0_masked = np.multiply(adj[add_ind[0]],dif_at_n0)
+            loss += np.max(dif) + 1.0 - np.max(dif_n0_masked)
+            if loss > np.max(masked_dif):
+                #print("Stop at No.{} step".format(s))
+                break
+            rm_ind = np.where(dif_n0_masked==np.max(dif_n0_masked))[0][0]
+            #if not graph.has_edge(add_ind[0],rm_ind):
+            #    print("wrong at first remove")
+            graph.remove_edge(add_ind[0], rm_ind)
+            rm_inds.append((add_ind[0], rm_ind))
+        if (degree[add_ind[1]] >= degree_lim):
+            dif_at_n1 = np.max(dif) + 1.0 - dif[add_ind[1]]
+            dif_n1_masked = np.multiply(adj[add_ind[1]], dif_at_n1)
+            loss += np.max(dif) + 1.0 - np.max(dif_n1_masked)
+            if  loss > np.max(masked_dif):
+                for removed in rm_inds:
+                    graph.add_edge(removed)
+                #print("Stop at No.{} step".format(s))
+                break
+            rm_ind = np.where(dif_n1_masked==np.max(dif_n1_masked))[0][0]
+            #if not graph.has_edge(add_ind[1],rm_ind):
+            #    print("wrong at second remove")
+            graph.remove_edge(add_ind[1], rm_ind)
+
+        if (degree[add_ind[0]] < degree_lim) and (degree[add_ind[1]] < degree_lim):
             graph.add_edge(add_ind[0], add_ind[1])
-            adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
-            degree = np.sum(adj, axis=-1)
+        adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
+        degree = np.sum(adj, axis=-1)
+    
+    #if s == max_adjust_steps - 1:
+    #    print("====== Stop at threhold =====")    
     
     path_length = cal_pathlength(demand, graph)
     return path_length
@@ -158,7 +185,7 @@ def expand_orders_mat(feature):
     N = feature.shape[0]
     exp_feature = np.ones((N,N,k), np.float32)
     for i in range(1,k):
-        exp_feature[:, i] = np.multiply(feature, exp_feature[:,i-1])
+        exp_feature[:, :, i] = np.multiply(feature, exp_feature[:,:,i-1])
     return exp_feature
 
 def cal_diff(v):
@@ -234,7 +261,7 @@ def test(solution, test_size):
 def test_run(param):
     solution = param['solution']
     demand = param['demand']
-    m = apply_policy(demand, solution)
+    m = apply_policy_replace(demand, solution)
     return m
 
 def apply_policy_robust(demand, alpha):
@@ -283,7 +310,7 @@ def apply_policy_robust(demand, alpha):
         else:
             add_ind = (ind_x[0], ind_y[0])
 
-        if (adj[add_ind] != 1) and (degree[add_ind[0]] < degree_lim) and (degree[add_ind[0]] < degree_lim):
+        if (adj[add_ind] != 1) and (degree[add_ind[0]] < degree_lim) and (degree[add_ind[1]] < degree_lim):
             graph.add_edge(add_ind[0], add_ind[1])
             adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
             degree = np.sum(adj, axis=-1)
