@@ -12,7 +12,7 @@ from param_search.OptSearch import TopoOperator, dict2dict, dict2nxdict
 from param_search.plotv import TopoSimulator
 from baseline.bmatching import bMatching
 
-methods = ["egotree"] # options: "optimal", "greedy", "egotree", "param-search", "rl", "bmatch"
+methods = ["optimal"] # options: "optimal", "greedy", "egotree", "param-search", "rl", "bmatch"
 data_source = "scratch" # options: "random8", "nsfnet", "geant2", "scratch"
 scheme = "complete" # options: "complete", "bysteps"
 Max_degree = 4
@@ -76,7 +76,7 @@ def compute_reward(state, num_node, demand, degree):
 
         cost += path_length * demand[s,d]   
 
-    cost /= (sum(sum(demand)))   
+    cost /= (sum(sum(demand)))
     return cost
 
 def main():
@@ -163,7 +163,7 @@ def main():
                 print("optimal: {}".format(cost_o))
                 #v_optimal = opt.consturct_v(best_action,neigh)
             if scheme == "complete":
-                cost, _ = opt.optimal_topology(node_num, demand, degree)
+                cost, _ = opt.optimal_topology_mp(node_num, demand, Max_degree)
                 cost_o = cost/(sum(sum(demand)))   
                 costs_opt.append(cost_o)
                 print("optimal: {}".format(cost_o))

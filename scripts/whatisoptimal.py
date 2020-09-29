@@ -2,6 +2,7 @@ import networkx as nx
 import numpy as np
 import itertools
 import copy
+from multiprocessing import Pool
 
 class optimal(object):
     def __init__(self):
@@ -224,7 +225,7 @@ class optimal(object):
         :param allowed_degree: (nparray)
         """
         max_edges = int(n_nodes * (n_nodes-1) / 2)
-        min_edges = n_nodes - 1
+        #min_edges = n_nodes - 1
         all_edges = list(range(max_edges))
         min_cost = self.inf
         best_graph = {}
@@ -252,7 +253,7 @@ class optimal(object):
                     print("checked: {}".format(cnt))
         """
         edges_comb = list(itertools.combinations(all_edges,n_nodes*2))
-        cnt = 0
+        #cnt = 0
         for edges in edges_comb:
             graph_dict.clear()
             for j in range(n_nodes):
@@ -265,11 +266,47 @@ class optimal(object):
             if cost < min_cost:
                 min_cost = cost
                 best_graph = graph_dict
-            cnt += 1
-            if cnt % 500000 == 0:
-                print("checked: {}".format(cnt))
+            #cnt += 1
+            #if cnt % 500000 == 0:
+            #    print("checked: {}".format(cnt))
 
         return min_cost, best_graph
+
+    def optimal_topology_mp(self, n_nodes, demand, degree):
+        print("patching data..")
+        max_edges = int(n_nodes * (n_nodes-1) / 2)
+        all_edges = list(range(max_edges))
+        edges_comb = list(itertools.combinations(all_edges,n_nodes*degree/2))
+        params = []
+        for edges in edges_comb:
+            param = {}
+            param["edges"] = edges
+            param["n"] = n_nodes
+            param["demand"] = demand
+            param["degree"] = degree
+            params.append(param)
+        print("Finished patching")
+        pool = Pool()
+        costs = pool.map(self.test_topo_run, params)
+        pool.close()
+        pool.join()
+        min_cost = np.min(np.array(costs))
+        return min_cost
+
+    def test_topo_run(self, param):
+        n_nodes = param['n']
+        edges = param['edges']
+        demand = param['demand']
+        allowed_degree = param['degree'] * np.ones((n_nodes,))
+        graph_dict = {}
+        for j in range(n_nodes):
+            graph_dict[j] = []
+        for e in edges:
+            [n1,n2] = edge_to_node(n_nodes, e)
+            graph_dict[n1].append(n2)
+            graph_dict[n2].append(n1)
+        cost = self.cal_cost_judge(n_nodes,graph_dict,demand,allowed_degree)
+        return cost
 
     def multistep_BFS(self,n_nodes,graph,demand,allowed_degree,n_steps=1):
         """

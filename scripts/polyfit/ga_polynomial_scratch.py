@@ -16,14 +16,14 @@ Given the following function:
     where y gets its minimum
 What are the best values for the weights (alpha)?
 """
-k = 3
+k = 4
 n_iters = 3
 degree_lim = 4
 n_workers = 12
-node_num = 8
+node_num = 12
 n_testings = 1000
 max_steps = int(node_num*degree_lim/2)
-max_adjust_steps = 10
+max_adjust_steps = 20
 
 file_demand = '../../data/10000_{0}_{1}_logistic.pk3'.format(node_num, degree_lim)
 file_logging = '../../poly_log/log{0}_{1}_{2}_{3}.pkl'.format(node_num,degree_lim,k,n_iters)
@@ -137,14 +137,13 @@ def apply_policy_replace(demand, alpha):
         #    print("wrong in the find")
 
         rm_inds = []
-
         loss = 0
         if (degree[add_ind[0]] >= degree_lim):
             dif_at_n0 = np.max(dif) + 1.0 - dif[add_ind[0]]
             dif_n0_masked = np.multiply(adj[add_ind[0]],dif_at_n0)
             loss += np.max(dif) + 1.0 - np.max(dif_n0_masked)
             if loss > np.max(masked_dif):
-                #print("Stop at No.{} step".format(s))
+                print("Stop at No.{} step".format(s))
                 break
             rm_ind = np.where(dif_n0_masked==np.max(dif_n0_masked))[0][0]
             #if not graph.has_edge(add_ind[0],rm_ind):
@@ -157,8 +156,8 @@ def apply_policy_replace(demand, alpha):
             loss += np.max(dif) + 1.0 - np.max(dif_n1_masked)
             if  loss > np.max(masked_dif):
                 for removed in rm_inds:
-                    graph.add_edge(removed)
-                #print("Stop at No.{} step".format(s))
+                    graph.add_edge(removed[0],removed[1])
+                print("Stop at No.{} step".format(s))
                 break
             rm_ind = np.where(dif_n1_masked==np.max(dif_n1_masked))[0][0]
             #if not graph.has_edge(add_ind[1],rm_ind):
@@ -170,8 +169,8 @@ def apply_policy_replace(demand, alpha):
         adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
         degree = np.sum(adj, axis=-1)
     
-    #if s == max_adjust_steps - 1:
-    #    print("====== Stop at threhold =====")    
+    if s == max_adjust_steps - 1:
+        print("Unwillingly terminated.")    
     
     path_length = cal_pathlength(demand, graph)
     return path_length
@@ -261,7 +260,7 @@ def test(solution, test_size):
 def test_run(param):
     solution = param['solution']
     demand = param['demand']
-    m = apply_policy_replace(demand, solution)
+    m = apply_policy(demand, solution)
     return m
 
 def apply_policy_robust(demand, alpha):
