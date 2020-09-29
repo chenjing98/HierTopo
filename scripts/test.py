@@ -11,8 +11,9 @@ from whatisoptimal import optimal
 from param_search.OptSearch import TopoOperator, dict2dict, dict2nxdict
 from param_search.plotv import TopoSimulator
 from baseline.bmatching import bMatching
+from multiprocessing import Pool
 
-methods = ["optimal"] # options: "optimal", "greedy", "egotree", "param-search", "rl", "bmatch"
+methods = ["optimal-mp"] # options: "optimal", "greedy", "egotree", "param-search", "rl", "bmatch", "optimal-mp"
 data_source = "scratch" # options: "random8", "nsfnet", "geant2", "scratch"
 scheme = "complete" # options: "complete", "bysteps"
 Max_degree = 4
@@ -120,92 +121,105 @@ def main():
         with open(file_topo, 'rb') as f2:
             dataset_topo = pk.load(f2)
 
-    # start testing
-    for i_iter in range(n_iters):
-        if data_source == "random8":
-            demand = dataset[i_iter]['demand']
-            degree = dataset[i_iter]['allowed_degree']
-            topo = dataset_topo[i_iter]
-        elif data_source == "scratch":
-            demand = dataset[i_iter]
-            degree = Max_degree * np.ones((node_num,), dtype=np.float32)
-        else:
-            demand = dataset[i_iter]
-            degree = Max_degree * np.ones((node_num,), dtype=np.float32)
-            topo = dataset_topo
+    if "optimal-mp" in methods:
+        params = []
+        for i_iter in range(n_iters):
+            param = {}
+            param["demand"] = dataset[i_iter]
+            param["degree"] = Max_degree
+            param["n_nodes"] = n_nodes
+            params.append(param)
+        pool = Pool()
+        costs_opt_mp = pool.map(opt.optimal_topology_run,params)
+        pool.close()
+        pool.join()
+    else:
+        # start testing
+        for i_iter in range(n_iters):
+            if data_source == "random8":
+                demand = dataset[i_iter]['demand']
+                degree = dataset[i_iter]['allowed_degree']
+                topo = dataset_topo[i_iter]
+            elif data_source == "scratch":
+                demand = dataset[i_iter]
+                degree = Max_degree * np.ones((node_num,), dtype=np.float32)
+            else:
+                demand = dataset[i_iter]
+                degree = Max_degree * np.ones((node_num,), dtype=np.float32)
+                topo = dataset_topo
 
-        print("[iter {}]".format(i_iter))
+            print("[iter {}]".format(i_iter))
 
-        if "egotree" in methods:
-            int_degree = degree.astype(int) 
-            test_e = ego_tree_unit(demand,node_num,int_degree,Max_degree)
-            test_e.create_tree()
-            test_e.change_insert()
-            state_e, _ = test_e.estab()
-            print("adj: {}".format(state_e))
-            cost_e = compute_reward(state_e, node_num, demand, degree)
-            costs_ego.append(cost_e)
-            print("egotree: {}".format(cost_e))
-        
-        if "bmatch" in methods:
-            cost_b = bmatch.match(demand)
-            #cost_b = compute_reward(state_b, node_num, demand, degree)
-            costs_b.append(cost_b)
-            print("bmatching: {}".format(cost_b))
+            if "egotree" in methods:
+                int_degree = degree.astype(int) 
+                test_e = ego_tree_unit(demand,node_num,int_degree,Max_degree)
+                test_e.create_tree()
+                test_e.change_insert()
+                state_e, _ = test_e.estab()
+                print("adj: {}".format(state_e))
+                cost_e = compute_reward(state_e, node_num, demand, degree)
+                costs_ego.append(cost_e)
+                print("egotree: {}".format(cost_e))
+            
+            if "bmatch" in methods:
+                cost_b = bmatch.match(demand)
+                #cost_b = compute_reward(state_b, node_num, demand, degree)
+                costs_b.append(cost_b)
+                print("bmatching: {}".format(cost_b))
 
-        if "optimal" in methods:
-            if scheme == "bysteps":
-                _, opt_dict = opt.multistep_DFS(node_num,topo,demand,degree,n_steps)
-                opt_graph = nx.from_dict_of_dicts(opt_dict)
-                state_o = np.array(nx.adjacency_matrix(opt_graph).todense(), np.float32)
-                cost_o = compute_reward(state_o, node_num, demand, degree)
-                costs_opt.append(cost_o)
-                print("optimal: {}".format(cost_o))
-                #v_optimal = opt.consturct_v(best_action,neigh)
-            if scheme == "complete":
-                cost, _ = opt.optimal_topology_mp(node_num, demand, Max_degree)
-                cost_o = cost/(sum(sum(demand)))   
-                costs_opt.append(cost_o)
-                print("optimal: {}".format(cost_o))
+            if "optimal" in methods:
+                if scheme == "bysteps":
+                    _, opt_dict = opt.multistep_DFS(node_num,topo,demand,degree,n_steps)
+                    opt_graph = nx.from_dict_of_dicts(opt_dict)
+                    state_o = np.array(nx.adjacency_matrix(opt_graph).todense(), np.float32)
+                    cost_o = compute_reward(state_o, node_num, demand, degree)
+                    costs_opt.append(cost_o)
+                    print("optimal: {}".format(cost_o))
+                    #v_optimal = opt.consturct_v(best_action,neigh)
+                if scheme == "complete":
+                    cost, _ = opt.optimal_topology(node_num, demand, degree)
+                    cost_o = cost/(sum(sum(demand)))   
+                    costs_opt.append(cost_o)
+                    print("optimal: {}".format(cost_o))
 
-        if "greedy" in methods:
-            if scheme == "bysteps":
-                origin_graph = nx.from_dict_of_dicts(topo)
-                permatch_new_graph = permatch_model.n_steps_matching(
-                        demand,origin_graph,degree,n_steps)
-                state_m = np.array(nx.adjacency_matrix(permatch_new_graph).todense(), np.float32)
-            if scheme == "complete":
-                state_m = permatch_model.matching(demand,degree)
-            cost_m = compute_reward(state_m, node_num, demand, degree)
-            costs_match.append(cost_m)
-            print("greedy: {}".format(cost_m))
+            if "greedy" in methods:
+                if scheme == "bysteps":
+                    origin_graph = nx.from_dict_of_dicts(topo)
+                    permatch_new_graph = permatch_model.n_steps_matching(
+                            demand,origin_graph,degree,n_steps)
+                    state_m = np.array(nx.adjacency_matrix(permatch_new_graph).todense(), np.float32)
+                if scheme == "complete":
+                    state_m = permatch_model.matching(demand,degree)
+                cost_m = compute_reward(state_m, node_num, demand, degree)
+                costs_match.append(cost_m)
+                print("greedy: {}".format(cost_m))
 
-        if "param-search" in methods:
-            curr_graph = topo
-            for i_step in range(n_steps):
-                v = opr.predict(curr_graph, demand)
-                if i_step < n_steps - 1:
-                    curr_graph = sim.step_graph(node_num, v, 
-                                            demand=demand, 
-                                            topology=curr_graph,
-                                            allowed_degree=degree)
-                else:
-                    cost_s = sim.step(node_num, v, 
-                                    demand=demand, 
-                                    topology=curr_graph, 
-                                    allowed_degree=degree)
-            costs_search.append(cost_s)
-            print("search: {}".format(cost_s))
+            if "param-search" in methods:
+                curr_graph = topo
+                for i_step in range(n_steps):
+                    v = opr.predict(curr_graph, demand)
+                    if i_step < n_steps - 1:
+                        curr_graph = sim.step_graph(node_num, v, 
+                                                demand=demand, 
+                                                topology=curr_graph,
+                                                allowed_degree=degree)
+                    else:
+                        cost_s = sim.step(node_num, v, 
+                                        demand=demand, 
+                                        topology=curr_graph, 
+                                        allowed_degree=degree)
+                costs_search.append(cost_s)
+                print("search: {}".format(cost_s))
 
-        if "rl" in methods:
-            obs = env.reset(demand=demand,degree=degree,provide=True)
-            for _ in range(n_steps):
-                action, _ = policy.predict(obs)
-                obs, _, _, _ = env.step(action)
-            state_rl = obs2adj(obs,node_num)
-            cost_rl = compute_reward(state_rl, node_num, demand, degree)
-            costs_rl.append(cost_rl)
-            print("RL: {}".format(cost_rl))
+            if "rl" in methods:
+                obs = env.reset(demand=demand,degree=degree,provide=True)
+                for _ in range(n_steps):
+                    action, _ = policy.predict(obs)
+                    obs, _, _, _ = env.step(action)
+                state_rl = obs2adj(obs,node_num)
+                cost_rl = compute_reward(state_rl, node_num, demand, degree)
+                costs_rl.append(cost_rl)
+                print("RL: {}".format(cost_rl))
         
         ## test supervised learning
         #obs = env.reset(demand=demand,degree=degree,provide=True)

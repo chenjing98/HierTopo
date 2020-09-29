@@ -252,9 +252,45 @@ class optimal(object):
                 if cnt % 10000 == 0:
                     print("checked: {}".format(cnt))
         """
-        edges_comb = list(itertools.combinations(all_edges,n_nodes*2))
+        edges_comb = itertools.combinations(all_edges,n_nodes*2)
         #cnt = 0
         for edges in edges_comb:
+            graph_dict.clear()
+            for j in range(n_nodes):
+                graph_dict[j] = []
+            for e in edges:
+                [n1,n2] = edge_to_node(n_nodes, e)
+                graph_dict[n1].append(n2)
+                graph_dict[n2].append(n1)
+            cost = self.cal_cost_judge(n_nodes,graph_dict,demand,allowed_degree)
+            if cost < min_cost:
+                min_cost = cost
+                best_graph = graph_dict
+            #cnt += 1
+            #if cnt % 500000 == 0:
+            #    print("checked: {}".format(cnt))
+
+        return min_cost, best_graph
+
+    def optimal_topology_run(self, param):
+        """Searching for the best topology.
+        :param n_nodes: (int) 
+        :param demand: (nparray)
+        :param allowed_degree: (nparray)
+        """
+        n_nodes = param["n_nodes"]
+        demand = param["demand"]
+        allowed_degree = param["degree"] * np.ones((n_nodes,))
+
+        max_edges = int(n_nodes * (n_nodes-1) / 2)
+        #min_edges = n_nodes - 1
+        all_edges = list(range(max_edges))
+        min_cost = self.inf
+        best_graph = {}
+        graph_dict = {}
+        
+        #cnt = 0
+        for edges in itertools.combinations(all_edges,n_nodes*2):
             graph_dict.clear()
             for j in range(n_nodes):
                 graph_dict[j] = []
@@ -276,7 +312,7 @@ class optimal(object):
         print("patching data..")
         max_edges = int(n_nodes * (n_nodes-1) / 2)
         all_edges = list(range(max_edges))
-        edges_comb = list(itertools.combinations(all_edges,int(n_nodes*degree/2)))
+        edges_comb = list(itertools.combinations(all_edges,int(n_nodes*degree/2))) # memory exploded
         params = []
         for edges in edges_comb:
             param = {}
