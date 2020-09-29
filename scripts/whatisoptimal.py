@@ -276,7 +276,7 @@ class optimal(object):
         print("patching data..")
         max_edges = int(n_nodes * (n_nodes-1) / 2)
         all_edges = list(range(max_edges))
-        edges_comb = list(itertools.combinations(all_edges,n_nodes*degree/2))
+        edges_comb = list(itertools.combinations(all_edges,int(n_nodes*degree/2)))
         params = []
         for edges in edges_comb:
             param = {}

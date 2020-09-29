@@ -17,7 +17,7 @@ data_source = "scratch" # options: "random8", "nsfnet", "geant2", "scratch"
 scheme = "complete" # options: "complete", "bysteps"
 Max_degree = 4
 n_steps = 2
-n_nodes = 10
+n_nodes = 9
 
 # parameters for "search"
 alpha_v = 1.2
