@@ -92,7 +92,7 @@ def main():
     # initialize models
     if "greedy" in methods:
         permatch_model = permatch(node_num)
-    if "optimal" in methods:
+    if "optimal" in methods or "optimal-mp" in methods:
         opt = optimal()
     if "param-search" in methods:
         opr = TopoOperator(node_num)
@@ -130,7 +130,8 @@ def main():
             param["n_nodes"] = n_nodes
             params.append(param)
         pool = Pool()
-        costs_opt_mp = pool.map(opt.optimal_topology_run,params)
+        costs = pool.map(opt.optimal_topology_run,params)
+        costs_opt_mp = np.array(costs)
         pool.close()
         pool.join()
     else:
@@ -266,6 +267,8 @@ def main():
     
     if "optimal" in methods:
         print("optimal : {0}  std : {1}".format(np.mean(costs_opt),np.std(costs_opt)))
+    if "optimal-mp" in methods:
+        print("optimal : {0}  std : {1}".format(np.mean(costs_opt_mp),np.std(costs_opt_mp)))
     if "greedy" in methods:
         print("greedy  : {0}  std : {1}".format(np.mean(costs_match),np.std(costs_match)))
     if "egotree" in methods:
