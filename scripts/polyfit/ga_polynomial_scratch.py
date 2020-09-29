@@ -20,10 +20,12 @@ k = 4
 n_iters = 3
 degree_lim = 4
 n_workers = 12
-node_num = 12
+node_num = 13
 n_testings = 1000
 max_steps = int(node_num*degree_lim/2)
 max_adjust_steps = 20
+
+adding_mode = "add" # "add" or "replace"
 
 file_demand = '../../data/10000_{0}_{1}_logistic.pk3'.format(node_num, degree_lim)
 file_logging = '../../poly_log/log{0}_{1}_{2}_{3}.pkl'.format(node_num,degree_lim,k,n_iters)
@@ -102,7 +104,7 @@ def apply_policy_replace(demand, alpha):
     #graph = nx.Graph()
     #graph.add_nodes_from(list(range(n_nodes)))
     #adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
-    adj = permatch_model.matching(demand, np.ones((node_num,)) * (degree_lim-1))
+    adj = permatch_model.matching(demand, np.ones((node_num,)) * (degree_lim-2))
     graph = nx.from_numpy_matrix(adj)
     degree = np.sum(adj, axis=-1)
 
@@ -260,7 +262,11 @@ def test(solution, test_size):
 def test_run(param):
     solution = param['solution']
     demand = param['demand']
-    m = apply_policy(demand, solution)
+    if adding_mode == "add":
+        func = apply_policy
+    elif adding_mode == "replace":
+        func = apply_policy_replace
+    m = func(demand, solution)
     return m
 
 def apply_policy_robust(demand, alpha):
@@ -320,8 +326,12 @@ def apply_policy_robust(demand, alpha):
 
 def test_robust(solution, test_size):
     metrics = []
+    if adding_mode == "add":
+        func = apply_policy
+    elif adding_mode == "replace":
+        func = apply_policy_replace
     for i in range(test_size):
-        m = apply_policy(dataset[i], solution)
+        m = func(dataset[i], solution)
         metrics.append(m)
         #print("[No. {0}] {1}".format(i,m))
     output = np.mean(metrics)
