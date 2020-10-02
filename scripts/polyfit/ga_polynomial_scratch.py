@@ -6,6 +6,7 @@ import pygad
 import pickle as pk
 import itertools
 import random
+import copy
 from multiprocessing import Pool
 from timeit import default_timer as timer
 from permatch import permatch
@@ -20,15 +21,18 @@ k = 4
 n_iters = 3
 degree_lim = 4
 n_workers = 12
-node_num = 13
+node_num = 8
 n_testings = 1000
 max_steps = int(node_num*degree_lim/2)
+max_pos = int(node_num*(node_num-1)/2)
 max_adjust_steps = 20
 
-adding_mode = "add" # "add" or "replace"
+adding_mode = "replace" # "add" or "replace"
 
 file_demand = '../../data/10000_{0}_{1}_logistic.pk3'.format(node_num, degree_lim)
 file_logging = '../../poly_log/log{0}_{1}_{2}_{3}.pkl'.format(node_num,degree_lim,k,n_iters)
+if adding_mode == "replace":
+    file_logging = '../../poly_log/log{0}_{1}_{2}_{3}_repl.pkl'.format(node_num,degree_lim,k,n_iters)
 
 print("Settings:\nn_nodes     = {0}\nn_order     = {1}\nn_iters     = {2}\nn_testings  = {3}\nparallelism = {4}".format(node_num, k, n_iters,n_testings,n_workers))
 
@@ -104,7 +108,7 @@ def apply_policy_replace(demand, alpha):
     #graph = nx.Graph()
     #graph.add_nodes_from(list(range(n_nodes)))
     #adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
-    adj = permatch_model.matching(demand, np.ones((node_num,)) * (degree_lim-2))
+    adj = permatch_model.matching(demand, np.ones((node_num,)) * (degree_lim-1))
     graph = nx.from_numpy_matrix(adj)
     degree = np.sum(adj, axis=-1)
 
@@ -145,7 +149,7 @@ def apply_policy_replace(demand, alpha):
             dif_n0_masked = np.multiply(adj[add_ind[0]],dif_at_n0)
             loss += np.max(dif) + 1.0 - np.max(dif_n0_masked)
             if loss > np.max(masked_dif):
-                print("Stop at No.{} step".format(s))
+                #print("Stop at No.{} step".format(s))
                 break
             rm_ind = np.where(dif_n0_masked==np.max(dif_n0_masked))[0][0]
             #if not graph.has_edge(add_ind[0],rm_ind):
@@ -159,24 +163,169 @@ def apply_policy_replace(demand, alpha):
             if  loss > np.max(masked_dif):
                 for removed in rm_inds:
                     graph.add_edge(removed[0],removed[1])
-                print("Stop at No.{} step".format(s))
+                #print("Stop at No.{} step".format(s))
                 break
             rm_ind = np.where(dif_n1_masked==np.max(dif_n1_masked))[0][0]
             #if not graph.has_edge(add_ind[1],rm_ind):
             #    print("wrong at second remove")
             graph.remove_edge(add_ind[1], rm_ind)
 
-        if (degree[add_ind[0]] < degree_lim) and (degree[add_ind[1]] < degree_lim):
-            graph.add_edge(add_ind[0], add_ind[1])
+        #if (degree[add_ind[0]] < degree_lim) and (degree[add_ind[1]] < degree_lim):
+        #    graph.add_edge(add_ind[0], add_ind[1])
+        graph.add_edge(add_ind[0], add_ind[1])
         adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
         degree = np.sum(adj, axis=-1)
     
-    if s == max_adjust_steps - 1:
-        print("Unwillingly terminated.")    
+    #if s == max_adjust_steps - 1:
+        #print("Unwillingly terminated.")    
     
     path_length = cal_pathlength(demand, graph)
     return path_length
 
+def apply_policy_replace_nsquare_list(demand, alpha):
+    n_nodes = node_num
+    graph = nx.Graph()
+    graph.add_nodes_from(list(range(n_nodes)))
+    adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
+    #adj = permatch_model.matching(demand, np.ones((node_num,)) * (degree_lim-1))
+    #graph = nx.from_numpy_matrix(adj)
+    degree = np.sum(adj, axis=-1)
+    
+    remaining_choices = list(range(max_pos))
+    rm_inds = []
+    failed_attempts = []
+
+    v = cal_v(demand, alpha, adj)
+    dif_e = cal_diff_inrange(v,remaining_choices)
+    while remaining_choices:
+        curr_e_num = dif_e.index(max(dif_e))
+        curr_e = remaining_choices[curr_e_num]
+        v1 = int(curr_e/node_num)
+        v2 = curr_e % node_num
+        if adj[v1,v2] == 1:
+            del remaining_choices[curr_e_num]
+            del dif_e[curr_e_num]
+            continue
+        if degree[v1] < degree_lim and degree[v2] < degree_lim:
+            graph.add_edge(v1,v2)
+            adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
+            degree = np.sum(adj, axis=-1)
+            v = cal_v(demand, alpha, adj)
+            del remaining_choices[curr_e_num]
+            dif_e = cal_diff_inrange(v,remaining_choices)
+        # need to remove some edges
+        elif degree[v1] >= degree_lim and degree[v2] >= degree_lim:
+            v1_neighbor = [n for n in graph.neighbors(v1)]
+            v1_edges = np.where(np.array(v1_neighbor) > v1, v1 * node_num + np.array(v1_neighbor), np.array(v1_neighbor) * node_num + v1).tolist()
+            dif_v1 = cal_diff_inrange(v, v1_edges)
+            v1_e_num = dif_v1.index(min(dif_v1))
+            e1_rm = v1_edges[v1_e_num]
+
+            v2_neighbor = [n for n in graph.neighbors(v2)]
+            v2_edges = np.where(np.array(v2_neighbor) > v2, v2 * node_num + np.array(v2_neighbor), np.array(v2_neighbor) * node_num + v2).tolist()
+            dif_v2 = cal_diff_inrange(v, v2_edges)
+            v2_e_num = dif_v2.index(min(dif_v2))
+            e2_rm = v2_edges[v2_e_num]
+
+            rm_inds.append(e1_rm)
+            rm_inds.append(e2_rm)
+            adj_rp = copy.deepcopy(adj)
+            adj_rp[int(e1_rm/node_num),e1_rm%node_num] = 0
+            adj_rp[e1_rm%node_num,int(e1_rm/node_num)] = 0
+            adj_rp[int(e2_rm/node_num),e2_rm%node_num] = 0
+            adj_rp[e2_rm%node_num,int(e2_rm/node_num)] = 0
+            adj_rp[v1,v2] = 1
+            adj_rp[v2,v1] = 1
+
+            v_rp = cal_v(demand, alpha, adj_rp)
+            if max(dif_e) + sum(cal_diff_inrange(v_rp,[curr_e])) > sum(cal_diff_inrange(v,rm_inds)) + sum(cal_diff_inrange(v_rp, rm_inds)):
+                graph.remove_edge(int(e1_rm/node_num),e1_rm%node_num)
+                graph.remove_edge(int(e2_rm/node_num),e2_rm%node_num)
+                graph.add_edge(v1,v2)
+                adj = adj_rp
+                degree = np.sum(adj, axis=-1)
+                v = v_rp
+                del remaining_choices[curr_e_num]
+                dif_e = cal_diff_inrange(v,remaining_choices)
+                rm_inds = []
+            else:
+                failed_attempts.append(curr_e)
+                del remaining_choices[curr_e_num]
+                del dif_e[curr_e_num]
+        elif degree[v1] >= degree_lim:
+            v1_neighbor = [n for n in graph.neighbors(v1)]
+            v1_edges = np.where(np.array(v1_neighbor) > v1, v1 * node_num + np.array(v1_neighbor), np.array(v1_neighbor) * node_num + v1).tolist()
+            dif_v1 = cal_diff_inrange(v, v1_edges)
+            v1_e_num = dif_v1.index(min(dif_v1))
+            e1_rm = v1_edges[v1_e_num]
+            rm_inds.append(e1_rm)
+            adj_rp = copy.deepcopy(adj)
+            adj_rp[int(e1_rm/node_num),e1_rm%node_num] = 0
+            adj_rp[e1_rm%node_num,int(e1_rm/node_num)] = 0
+            adj_rp[v1,v2] = 1
+            adj_rp[v2,v1] = 1
+            v_rp = cal_v(demand, alpha, adj_rp)
+            if max(dif_e) + sum(cal_diff_inrange(v_rp,[curr_e])) > sum(cal_diff_inrange(v,rm_inds)) + sum(cal_diff_inrange(v_rp, rm_inds)):
+                graph.remove_edge(int(e1_rm/node_num),e1_rm%node_num)
+                graph.add_edge(v1,v2)
+                adj = adj_rp
+                degree = np.sum(adj, axis=-1)
+                v = v_rp
+                del remaining_choices[curr_e_num]
+                dif_e = cal_diff_inrange(v,remaining_choices)
+                rm_inds = []
+            else:
+                failed_attempts.append(curr_e)
+                del remaining_choices[curr_e_num]
+                del dif_e[curr_e_num]
+        else:
+            v2_neighbor = [n for n in graph.neighbors(v2)]
+            v2_edges = np.where(np.array(v2_neighbor) > v2, v2 * node_num + np.array(v2_neighbor), np.array(v2_neighbor) * node_num + v2).tolist()
+            dif_v2 = cal_diff_inrange(v, v2_edges)
+            v2_e_num = dif_v2.index(min(dif_v2))
+            e2_rm = v2_edges[v2_e_num]
+            rm_inds.append(e2_rm)
+            adj_rp = copy.deepcopy(adj)
+            adj_rp[int(e2_rm/node_num),e2_rm%node_num] = 0
+            adj_rp[e2_rm%node_num,int(e2_rm/node_num)] = 0
+            adj_rp[v1,v2] = 1
+            adj_rp[v2,v1] = 1
+            v_rp = cal_v(demand, alpha, adj_rp)
+            if max(dif_e) + sum(cal_diff_inrange(v_rp,[curr_e])) > sum(cal_diff_inrange(v,rm_inds)) + sum(cal_diff_inrange(v_rp, rm_inds)):
+                graph.remove_edge(int(e2_rm/node_num),e2_rm%node_num)
+                graph.add_edge(v1,v2)
+                adj = adj_rp
+                degree = np.sum(adj, axis=-1)
+                v = v_rp
+                del remaining_choices[curr_e_num]
+                dif_e = cal_diff_inrange(v,remaining_choices)
+                rm_inds = []
+            else:
+                failed_attempts.append(curr_e)
+                del remaining_choices[curr_e_num]
+                del dif_e[curr_e_num]
+
+    path_length = cal_pathlength(demand, graph)
+    return path_length
+        
+
+def cal_v(demand, alpha, adj):
+    x = demand/np.max(demand)*2 - 1 # [N]
+    x = x.T
+    z = np.zeros((node_num,node_num), np.float32)
+    for i in range(n_iters):
+        exp_x = expand_orders_mat(x)
+        weighing_self = np.matmul(exp_x, alpha[2*i*k:(2*i+1)*k])
+        weighing_neigh = np.matmul(exp_x, alpha[(2*i+1)*k:(2*i+2)*k])
+        neighbor_aggr = np.matmul(weighing_neigh, adj)
+        g = weighing_self + neighbor_aggr
+        #x = g/np.max(g)*2 # N x N
+        gpos = np.where(g>=0,g,z)
+        gneg = np.where(g<0,g,z)
+        x = 1/(1+np.exp(-gpos)) + np.exp(gneg)/(1+np.exp(gneg)) - 1/2
+        
+    v = np.sum(x, axis=0)
+    return v
 
 def expand_orders_mat(feature):
     """
@@ -190,9 +339,17 @@ def expand_orders_mat(feature):
     return exp_feature
 
 def cal_diff(v):
-    N = v.shape[0]
-    dif = np.repeat(np.expand_dims(v,0),N,0) - np.repeat(np.expand_dims(v,-1),N,-1)
+    dif = np.repeat(np.expand_dims(v,0),node_num,0) - np.repeat(np.expand_dims(v,-1),node_num,-1)
     dif = np.abs(dif)
+    return dif
+
+def cal_diff_inrange(v, edges):
+    dif = []
+    for i in range(len(edges)):
+        e = edges[i]
+        v1 = int(e/node_num)
+        v2 = e % node_num
+        dif.append(np.abs(v[v1]-v[v2]))
     return dif
     
 
@@ -265,7 +422,7 @@ def test_run(param):
     if adding_mode == "add":
         func = apply_policy
     elif adding_mode == "replace":
-        func = apply_policy_replace
+        func = apply_policy_replace_nsquare_list
     m = func(demand, solution)
     return m
 
