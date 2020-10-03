@@ -21,7 +21,7 @@ k = 4
 n_iters = 3
 degree_lim = 4
 n_workers = 12
-node_num = 8
+node_num = 12
 n_testings = 1000
 max_steps = int(node_num*degree_lim/2)
 max_pos = int(node_num*(node_num-1)/2)
@@ -34,7 +34,7 @@ file_logging = '../../poly_log/log{0}_{1}_{2}_{3}.pkl'.format(node_num,degree_li
 if adding_mode == "replace":
     file_logging = '../../poly_log/log{0}_{1}_{2}_{3}_repl.pkl'.format(node_num,degree_lim,k,n_iters)
 
-print("Settings:\nn_nodes     = {0}\nn_order     = {1}\nn_iters     = {2}\nn_testings  = {3}\nparallelism = {4}".format(node_num, k, n_iters,n_testings,n_workers))
+print("Settings:\nn_nodes     = {0}\nn_order     = {1}\nn_iters     = {2}\nn_testings  = {3}\nadding_mode = {4}".format(node_num, k, n_iters,n_testings,adding_mode))
 
 permatch_model = permatch(node_num)
 
@@ -191,7 +191,10 @@ def apply_policy_replace_nsquare_list(demand, alpha):
     #graph = nx.from_numpy_matrix(adj)
     degree = np.sum(adj, axis=-1)
     
-    remaining_choices = list(range(max_pos))
+    remaining_choices = []
+    for i in range(node_num-1):
+        for j in range(i+1,node_num):
+            remaining_choices.append(i*node_num+j)
     rm_inds = []
     failed_attempts = []
 
@@ -227,8 +230,7 @@ def apply_policy_replace_nsquare_list(demand, alpha):
             v2_e_num = dif_v2.index(min(dif_v2))
             e2_rm = v2_edges[v2_e_num]
 
-            rm_inds.append(e1_rm)
-            rm_inds.append(e2_rm)
+            rm_inds = [e1_rm, e2_rm]
             adj_rp = copy.deepcopy(adj)
             adj_rp[int(e1_rm/node_num),e1_rm%node_num] = 0
             adj_rp[e1_rm%node_num,int(e1_rm/node_num)] = 0
@@ -238,7 +240,7 @@ def apply_policy_replace_nsquare_list(demand, alpha):
             adj_rp[v2,v1] = 1
 
             v_rp = cal_v(demand, alpha, adj_rp)
-            if max(dif_e) + sum(cal_diff_inrange(v_rp,[curr_e])) > sum(cal_diff_inrange(v,rm_inds)) + sum(cal_diff_inrange(v_rp, rm_inds)):
+            if max(dif_e) + sum(cal_diff_inrange(v,rm_inds)) > sum(cal_diff_inrange(v_rp,[curr_e])) + sum(cal_diff_inrange(v_rp, rm_inds)):
                 graph.remove_edge(int(e1_rm/node_num),e1_rm%node_num)
                 graph.remove_edge(int(e2_rm/node_num),e2_rm%node_num)
                 graph.add_edge(v1,v2)
@@ -247,7 +249,6 @@ def apply_policy_replace_nsquare_list(demand, alpha):
                 v = v_rp
                 del remaining_choices[curr_e_num]
                 dif_e = cal_diff_inrange(v,remaining_choices)
-                rm_inds = []
             else:
                 failed_attempts.append(curr_e)
                 del remaining_choices[curr_e_num]
@@ -265,7 +266,7 @@ def apply_policy_replace_nsquare_list(demand, alpha):
             adj_rp[v1,v2] = 1
             adj_rp[v2,v1] = 1
             v_rp = cal_v(demand, alpha, adj_rp)
-            if max(dif_e) + sum(cal_diff_inrange(v_rp,[curr_e])) > sum(cal_diff_inrange(v,rm_inds)) + sum(cal_diff_inrange(v_rp, rm_inds)):
+            if max(dif_e) + sum(cal_diff_inrange(v,rm_inds)) > sum(cal_diff_inrange(v_rp,[curr_e])) + sum(cal_diff_inrange(v_rp, rm_inds)):
                 graph.remove_edge(int(e1_rm/node_num),e1_rm%node_num)
                 graph.add_edge(v1,v2)
                 adj = adj_rp
@@ -291,7 +292,7 @@ def apply_policy_replace_nsquare_list(demand, alpha):
             adj_rp[v1,v2] = 1
             adj_rp[v2,v1] = 1
             v_rp = cal_v(demand, alpha, adj_rp)
-            if max(dif_e) + sum(cal_diff_inrange(v_rp,[curr_e])) > sum(cal_diff_inrange(v,rm_inds)) + sum(cal_diff_inrange(v_rp, rm_inds)):
+            if max(dif_e) + sum(cal_diff_inrange(v,rm_inds)) > sum(cal_diff_inrange(v_rp,[curr_e])) + sum(cal_diff_inrange(v_rp, rm_inds)):
                 graph.remove_edge(int(e2_rm/node_num),e2_rm%node_num)
                 graph.add_edge(v1,v2)
                 adj = adj_rp
@@ -305,6 +306,7 @@ def apply_policy_replace_nsquare_list(demand, alpha):
                 del remaining_choices[curr_e_num]
                 del dif_e[curr_e_num]
 
+    #print(graph.number_of_edges())
     path_length = cal_pathlength(demand, graph)
     return path_length
         
@@ -558,7 +560,7 @@ t_end = timer()
 # After the generations complete, some plots are showed that summarize the how the outputs/fitenss values evolve over generations.
 #ga_instance.plot_result()
 
-print("Settings:\nn_nodes     = {0}\nn_order     = {1}\nn_iters     = {2}\nn_testings  = {3}\nparallelism = {4}".format(node_num, k, n_iters,n_testings,n_workers))
+print("Settings:\nn_nodes     = {0}\nn_order     = {1}\nn_iters     = {2}\nn_testings  = {3}\nadding_mode = {4}".format(node_num, k, n_iters,n_testings,adding_mode))
 
 # Returning the details of the best solution.
 solution, solution_fitness, solution_idx = ga_instance.best_solution()
