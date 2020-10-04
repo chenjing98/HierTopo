@@ -4,10 +4,10 @@ import math
 
 # Set parameters
 data_count = 10000
-num_nodes = 15
+num_nodes = 25
 max_degree = 4
 distribution = 'logistic'
-file_name = '../../data/traindata/{0}_{1}_{2}_{3}.pk3'.format(data_count, num_nodes, max_degree, distribution)
+file_name = '../../data/{0}_{1}_{2}_{3}.pk3'.format(data_count, num_nodes, max_degree, distribution)
 
 dataset = []
 

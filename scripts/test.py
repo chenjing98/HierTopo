@@ -13,12 +13,12 @@ from param_search.plotv import TopoSimulator
 from baseline.bmatching import bMatching
 from multiprocessing import Pool
 
-methods = ["optimal-mp"] # options: "optimal", "greedy", "egotree", "param-search", "rl", "bmatch", "optimal-mp"
+methods = ["greedy"] # options: "optimal", "greedy", "egotree", "param-search", "rl", "bmatch", "optimal-mp"
 data_source = "scratch" # options: "random8", "nsfnet", "geant2", "scratch"
 scheme = "complete" # options: "complete", "bysteps"
 Max_degree = 4
 n_steps = 2
-n_nodes = 9
+n_nodes = 20
 
 # parameters for "search"
 alpha_v = 1.2
