@@ -9,9 +9,9 @@ from permatch import permatch
 from timeit import default_timer as timer
 
 k = 4
-n_nodes = 17
-n_nodes_param = 11
-n_iters = 3
+n_nodes = 12
+n_nodes_param = 12
+n_iters = 10
 degree_lim = 4
 desired_output = 0.99
 parallelism = 10
@@ -357,7 +357,7 @@ def apply_policy_replace_nsquare_list(demand, alpha):
                 del remaining_choices[curr_e_num]
                 del dif_e[curr_e_num]
 
-    print(graph.number_of_edges())
+    #print(graph.number_of_edges())
     path_length = cal_pathlength(demand, graph)
     return path_length
 

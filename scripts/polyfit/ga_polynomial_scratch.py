@@ -18,10 +18,10 @@ Given the following function:
 What are the best values for the weights (alpha)?
 """
 k = 4
-n_iters = 3
+n_iters = 10
 degree_lim = 4
 n_workers = 12
-node_num = 12
+node_num = 10
 n_testings = 1000
 max_steps = int(node_num*degree_lim/2)
 max_pos = int(node_num*(node_num-1)/2)
@@ -30,9 +30,9 @@ max_adjust_steps = 20
 adding_mode = "replace" # "add" or "replace"
 
 file_demand = '../../data/10000_{0}_{1}_logistic.pk3'.format(node_num, degree_lim)
-file_logging = '../../poly_log/log{0}_{1}_{2}_{3}.pkl'.format(node_num,degree_lim,k,n_iters)
+file_logging = '../../poly_log/log{0}_{1}_{2}_{3}_same.pkl'.format(node_num,degree_lim,k,n_iters)
 if adding_mode == "replace":
-    file_logging = '../../poly_log/log{0}_{1}_{2}_{3}_repl.pkl'.format(node_num,degree_lim,k,n_iters)
+    file_logging = '../../poly_log/log{0}_{1}_{2}_{3}_same_repl.pkl'.format(node_num,degree_lim,k,n_iters)
 
 print("Settings:\nn_nodes     = {0}\nn_order     = {1}\nn_iters     = {2}\nn_testings  = {3}\nadding_mode = {4}".format(node_num, k, n_iters,n_testings,adding_mode))
 
@@ -64,8 +64,8 @@ def apply_policy(demand, alpha):
         x = x.T
         for i in range(n_iters):
             exp_x = expand_orders_mat(x)
-            weighing_self = np.matmul(exp_x, alpha[2*i*k:(2*i+1)*k])
-            weighing_neigh = np.matmul(exp_x, alpha[(2*i+1)*k:(2*i+2)*k])
+            weighing_self = np.matmul(exp_x, alpha[0:k])
+            weighing_neigh = np.matmul(exp_x, alpha[k:2*k])
             neighbor_aggr = np.matmul(weighing_neigh, adj)
             g = weighing_self + neighbor_aggr
             #x = g/np.max(g)*2 # N x N
@@ -118,8 +118,8 @@ def apply_policy_replace(demand, alpha):
         x = x.T
         for i in range(n_iters):
             exp_x = expand_orders_mat(x)
-            weighing_self = np.matmul(exp_x, alpha[2*i*k:(2*i+1)*k])
-            weighing_neigh = np.matmul(exp_x, alpha[(2*i+1)*k:(2*i+2)*k])
+            weighing_self = np.matmul(exp_x, alpha[0:k])
+            weighing_neigh = np.matmul(exp_x, alpha[k:2*k])
             neighbor_aggr = np.matmul(weighing_neigh, adj)
             g = weighing_self + neighbor_aggr
             #x = g/np.max(g)*2 # N x N
@@ -317,8 +317,8 @@ def cal_v(demand, alpha, adj):
     z = np.zeros((node_num,node_num), np.float32)
     for i in range(n_iters):
         exp_x = expand_orders_mat(x)
-        weighing_self = np.matmul(exp_x, alpha[2*i*k:(2*i+1)*k])
-        weighing_neigh = np.matmul(exp_x, alpha[(2*i+1)*k:(2*i+2)*k])
+        weighing_self = np.matmul(exp_x, alpha[0:k])
+        weighing_neigh = np.matmul(exp_x, alpha[k:2*k])
         neighbor_aggr = np.matmul(weighing_neigh, adj)
         g = weighing_self + neighbor_aggr
         #x = g/np.max(g)*2 # N x N
@@ -488,7 +488,7 @@ def test_robust(solution, test_size):
     if adding_mode == "add":
         func = apply_policy
     elif adding_mode == "replace":
-        func = apply_policy_replace
+        func = apply_policy_replace_nsquare_list
     for i in range(test_size):
         m = func(dataset[i], solution)
         metrics.append(m)
@@ -514,7 +514,7 @@ num_parents_mating = 7 # Number of solutions to be selected as parents in the ma
 # 1) Prepare it yourself and pass it to the initial_population parameter. This way is useful when the user wants to start the genetic algorithm with a custom initial population.
 # 2) Assign valid integer values to the sol_per_pop and num_genes parameters. If the initial_population parameter exists, then the sol_per_pop and num_genes parameters are useless.
 sol_per_pop = 50 # Number of solutions in the population.
-num_genes = 2 * k * n_iters
+num_genes = 2 * k
 
 init_range_low = -2
 init_range_high = 5
