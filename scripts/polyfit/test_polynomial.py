@@ -10,7 +10,7 @@ from timeit import default_timer as timer
 
 k = 4
 n_nodes = 12
-n_nodes_param = 12
+n_nodes_param = 10
 n_iters = 10
 degree_lim = 4
 desired_output = 0.99
@@ -21,7 +21,7 @@ max_steps = int(n_nodes*degree_lim/2)
 max_pos = int(n_nodes*(n_nodes-1)/2)
 max_adjust_steps = 20
 
-adding_mode = "add"
+adding_mode = "replace"
 
 data_source = "scratch"
 
@@ -52,9 +52,9 @@ else:
     print("data_source {} unrecognized.".format(data_source))
     exit(1)
 
-file_logging = '../../poly_log/log{0}_{1}_{2}_{3}.pkl'.format(n_nodes_param,degree_lim,k,n_iters)
+file_logging = '../../poly_log/log{0}_{1}_{2}_{3}_same.pkl'.format(n_nodes_param,degree_lim,k,n_iters)
 if adding_mode == "replace":
-    file_logging = '../../poly_log/log{0}_{1}_{2}_{3}_repl.pkl'.format(node_num,degree_lim,k,n_iters)
+    file_logging = '../../poly_log/log{0}_{1}_{2}_{3}_same_repl.pkl'.format(n_nodes_param,degree_lim,k,n_iters)
 with open(file_demand, 'rb') as f1:
     dataset = pk.load(f1)
 #with open(file_topo, 'rb') as f2:
@@ -115,8 +115,8 @@ def apply_policy(demand, alpha):
         x = x.T
         for i in range(n_iters):
             exp_x = expand_orders_mat(x)
-            weighing_self = np.matmul(exp_x, alpha[2*i*k:(2*i+1)*k])
-            weighing_neigh = np.matmul(exp_x, alpha[(2*i+1)*k:(2*i+2)*k])
+            weighing_self = np.matmul(exp_x, alpha[0:k])
+            weighing_neigh = np.matmul(exp_x, alpha[k:2*k])
             neighbor_aggr = np.matmul(weighing_neigh, adj)
             g = weighing_self + neighbor_aggr
             #x = g/np.max(g)*2 # N x N
@@ -147,6 +147,7 @@ def apply_policy(demand, alpha):
     
     path_length = cal_pathlength(demand, graph)
     return path_length
+
 
 def apply_policy_replace(demand, alpha):
     """Policy with greedy initialization & link tearing down.
@@ -279,8 +280,7 @@ def apply_policy_replace_nsquare_list(demand, alpha):
             v2_e_num = dif_v2.index(min(dif_v2))
             e2_rm = v2_edges[v2_e_num]
 
-            rm_inds.append(e1_rm)
-            rm_inds.append(e2_rm)
+            rm_inds = [e1_rm, e2_rm]
             adj_rp = copy.deepcopy(adj)
             adj_rp[int(e1_rm/node_num),e1_rm%node_num] = 0
             adj_rp[e1_rm%node_num,int(e1_rm/node_num)] = 0
@@ -290,7 +290,7 @@ def apply_policy_replace_nsquare_list(demand, alpha):
             adj_rp[v2,v1] = 1
 
             v_rp = cal_v(demand, alpha, adj_rp)
-            if max(dif_e) + sum(cal_diff_inrange(v_rp,[curr_e])) > sum(cal_diff_inrange(v,rm_inds)) + sum(cal_diff_inrange(v_rp, rm_inds)):
+            if max(dif_e) + sum(cal_diff_inrange(v,rm_inds)) > sum(cal_diff_inrange(v_rp,[curr_e])) + sum(cal_diff_inrange(v_rp, rm_inds)):
                 graph.remove_edge(int(e1_rm/node_num),e1_rm%node_num)
                 graph.remove_edge(int(e2_rm/node_num),e2_rm%node_num)
                 graph.add_edge(v1,v2)
@@ -299,7 +299,6 @@ def apply_policy_replace_nsquare_list(demand, alpha):
                 v = v_rp
                 del remaining_choices[curr_e_num]
                 dif_e = cal_diff_inrange(v,remaining_choices)
-                rm_inds = []
             else:
                 failed_attempts.append(curr_e)
                 del remaining_choices[curr_e_num]
@@ -317,7 +316,7 @@ def apply_policy_replace_nsquare_list(demand, alpha):
             adj_rp[v1,v2] = 1
             adj_rp[v2,v1] = 1
             v_rp = cal_v(demand, alpha, adj_rp)
-            if max(dif_e) + sum(cal_diff_inrange(v_rp,[curr_e])) > sum(cal_diff_inrange(v,rm_inds)) + sum(cal_diff_inrange(v_rp, rm_inds)):
+            if max(dif_e) + sum(cal_diff_inrange(v,rm_inds)) > sum(cal_diff_inrange(v_rp,[curr_e])) + sum(cal_diff_inrange(v_rp, rm_inds)):
                 graph.remove_edge(int(e1_rm/node_num),e1_rm%node_num)
                 graph.add_edge(v1,v2)
                 adj = adj_rp
@@ -343,7 +342,7 @@ def apply_policy_replace_nsquare_list(demand, alpha):
             adj_rp[v1,v2] = 1
             adj_rp[v2,v1] = 1
             v_rp = cal_v(demand, alpha, adj_rp)
-            if max(dif_e) + sum(cal_diff_inrange(v_rp,[curr_e])) > sum(cal_diff_inrange(v,rm_inds)) + sum(cal_diff_inrange(v_rp, rm_inds)):
+            if max(dif_e) + sum(cal_diff_inrange(v,rm_inds)) > sum(cal_diff_inrange(v_rp,[curr_e])) + sum(cal_diff_inrange(v_rp, rm_inds)):
                 graph.remove_edge(int(e2_rm/node_num),e2_rm%node_num)
                 graph.add_edge(v1,v2)
                 adj = adj_rp
@@ -376,8 +375,8 @@ def cal_v(demand, alpha, adj):
     z = np.zeros((node_num,node_num), np.float32)
     for i in range(n_iters):
         exp_x = expand_orders_mat(x)
-        weighing_self = np.matmul(exp_x, alpha[2*i*k:(2*i+1)*k])
-        weighing_neigh = np.matmul(exp_x, alpha[(2*i+1)*k:(2*i+2)*k])
+        weighing_self = np.matmul(exp_x, alpha[0:k])
+        weighing_neigh = np.matmul(exp_x, alpha[k:2*k])
         neighbor_aggr = np.matmul(weighing_neigh, adj)
         g = weighing_self + neighbor_aggr
         #x = g/np.max(g)*2 # N x N
