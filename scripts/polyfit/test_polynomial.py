@@ -8,10 +8,11 @@ import multiprocessing
 from permatch import permatch
 from timeit import default_timer as timer
 
-k = 4
-n_nodes = 12
-n_nodes_param = 10
-n_iters = 10
+k = 3
+n_nodes = 50
+n_nodes_param = 12
+n_iters = 12
+n_iters_param = 12
 degree_lim = 4
 desired_output = 0.99
 parallelism = 10
@@ -47,14 +48,14 @@ elif data_source == "scratch":
     node_num = n_nodes
     n_testings = 1000
     #n_iters = int(n_nodes*(n_nodes-1)/2)
-    file_demand = '../../data/10000_{0}_{1}_logistic.pk3'.format(n_nodes, degree_lim)
+    file_demand = '../../data/2000_{0}_{1}_logistic.pk3'.format(n_nodes, degree_lim)
 else:
     print("data_source {} unrecognized.".format(data_source))
     exit(1)
 
-file_logging = '../../poly_log/log{0}_{1}_{2}_{3}_same.pkl'.format(n_nodes_param,degree_lim,k,n_iters)
+file_logging = '../../poly_log/log{0}_{1}_{2}_{3}_same.pkl'.format(n_nodes_param,degree_lim,k,n_iters_param)
 if adding_mode == "replace":
-    file_logging = '../../poly_log/log{0}_{1}_{2}_{3}_same_repl.pkl'.format(n_nodes_param,degree_lim,k,n_iters)
+    file_logging = '../../poly_log/log{0}_{1}_{2}_{3}_same_repl.pkl'.format(n_nodes_param,degree_lim,k,n_iters_param)
 with open(file_demand, 'rb') as f1:
     dataset = pk.load(f1)
 #with open(file_topo, 'rb') as f2:

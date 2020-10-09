@@ -17,11 +17,11 @@ Given the following function:
     where y gets its minimum
 What are the best values for the weights (alpha)?
 """
-k = 4
-n_iters = 10
+k = 3
+n_iters = 30
 degree_lim = 4
 n_workers = 12
-node_num = 10
+node_num = 30
 n_testings = 1000
 max_steps = int(node_num*degree_lim/2)
 max_pos = int(node_num*(node_num-1)/2)
@@ -29,7 +29,10 @@ max_adjust_steps = 20
 
 adding_mode = "replace" # "add" or "replace"
 
-file_demand = '../../data/10000_{0}_{1}_logistic.pk3'.format(node_num, degree_lim)
+if node_num <= 25:
+    file_demand = '../../data/10000_{0}_{1}_logistic.pk3'.format(node_num, degree_lim)
+else:
+    file_demand = '../../data/2000_{0}_{1}_logistic.pk3'.format(node_num, degree_lim)
 file_logging = '../../poly_log/log{0}_{1}_{2}_{3}_same.pkl'.format(node_num,degree_lim,k,n_iters)
 if adding_mode == "replace":
     file_logging = '../../poly_log/log{0}_{1}_{2}_{3}_same_repl.pkl'.format(node_num,degree_lim,k,n_iters)
@@ -507,20 +510,20 @@ def fitness_func(solution, solution_idx):
 
 fitness_function = fitness_func
 
-num_generations = 100 # Number of generations.
+num_generations = 10 # Number of generations.
 num_parents_mating = 7 # Number of solutions to be selected as parents in the mating pool.
 
 # To prepare the initial population, there are 2 ways:
 # 1) Prepare it yourself and pass it to the initial_population parameter. This way is useful when the user wants to start the genetic algorithm with a custom initial population.
 # 2) Assign valid integer values to the sol_per_pop and num_genes parameters. If the initial_population parameter exists, then the sol_per_pop and num_genes parameters are useless.
-sol_per_pop = 50 # Number of solutions in the population.
+sol_per_pop = 20 # Number of solutions in the population.
 num_genes = 2 * k
 
 init_range_low = -2
 init_range_high = 5
 
 parent_selection_type = "sss" # Type of parent selection.
-keep_parents = 7 # Number of parents to keep in the next population. -1 means keep all parents and 0 means keep nothing.
+keep_parents = 5 # Number of parents to keep in the next population. -1 means keep all parents and 0 means keep nothing.
 
 crossover_type = "single_point" # Type of the crossover operator.
 
@@ -552,10 +555,23 @@ ga_instance = pygad.GA(num_generations=num_generations,
                        callback_generation=callback_generation)
 t_begin = timer()
 
+for s in range(10):
 # Running the GA to optimize the parameters of the function.
-ga_instance.run()
+    ga_instance.run()
 
-t_end = timer()
+    t_end = timer()
+    solution, solution_fitness, solution_idx = ga_instance.best_solution()
+    log = {}
+    # Logging
+    log["solution"] = solution
+    log["solution_idx"] = solution_idx
+    log["time"] = t_end-t_begin
+    log["fitness"] = ga_instance.best_solutions_fitness
+    log["best_solutions_generations"] = ga_instance.best_solution_generation
+    log["pop"] = ga_instance.population
+
+    with open(file_logging+str(s), 'wb') as f2:
+        pk.dump(log, f2)
 
 # After the generations complete, some plots are showed that summarize the how the outputs/fitenss values evolve over generations.
 #ga_instance.plot_result()
@@ -568,8 +584,8 @@ print("Parameters of the best solution : {solution}".format(solution=solution))
 print("Fitness value of the best solution = {solution_fitness}".format(solution_fitness=solution_fitness))
 print("Index of the best solution : {solution_idx}".format(solution_idx=solution_idx))
 
-prediction, prediction_std = test_robust(solution, n_testings)
-print("Predicted output based on the best solution : {prediction}, std : {std}".format(prediction=prediction, std=prediction_std))
+#prediction, prediction_std = test_robust(solution, n_testings)
+#print("Predicted output based on the best solution : {prediction}, std : {std}".format(prediction=prediction, std=prediction_std))
 
 if ga_instance.best_solution_generation != -1:
     print("Best fitness value reached after {best_solution_generation} generations.".format(best_solution_generation=ga_instance.best_solution_generation))
@@ -578,14 +594,14 @@ log = {}
 # Logging
 log["solution"] = solution
 log["solution_idx"] = solution_idx
-log["prediction"] = prediction
-log["prediction_std"] = prediction_std
+#log["prediction"] = prediction
+#log["prediction_std"] = prediction_std
 log["time"] = t_end-t_begin
 log["fitness"] = ga_instance.best_solutions_fitness
 log["best_solutions_generations"] = ga_instance.best_solution_generation
 
-with open(file_logging, 'wb') as f2:
-    pk.dump(log, f2)
+with open(file_logging, 'wb') as f3:
+    pk.dump(log, f3)
 
 print("Time: {} s".format(t_end-t_begin))
 # Saving the GA instance.
