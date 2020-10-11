@@ -13,12 +13,12 @@ from param_search.plotv import TopoSimulator
 from baseline.bmatching import bMatching
 from multiprocessing import Pool
 
-methods = ["greedy"] # options: "optimal", "greedy", "egotree", "param-search", "rl", "bmatch", "optimal-mp"
+methods = ["oblivious-opt"] # options: "optimal", "greedy", "egotree", "param-search", "rl", "bmatch", "optimal-mp", "oblivious"
 data_source = "scratch" # options: "random8", "nsfnet", "geant2", "scratch"
 scheme = "complete" # options: "complete", "bysteps"
 Max_degree = 4
 n_steps = 2
-n_nodes = 20
+n_nodes = 50
 
 # parameters for "search"
 alpha_v = 1.2
@@ -60,7 +60,7 @@ elif data_source == "germany":
 elif data_source == "scratch":
     node_num = n_nodes
     n_iters = 1000
-    file_demand = '../data/10000_{0}_{1}_logistic.pk3'.format(n_nodes, Max_degree)
+    file_demand = '../data/2000_{0}_{1}_logistic.pk3'.format(n_nodes, Max_degree)
 else:
     print("data_source {} unrecognized.".format(data_source))
     exit(1)
@@ -87,12 +87,13 @@ def main():
     costs_search = []
     costs_rl = []
     costs_b = []
+    costs_ob = []
 
     t_begin = timer()
     # initialize models
     if "greedy" in methods:
         permatch_model = permatch(node_num)
-    if "optimal" in methods or "optimal-mp" in methods:
+    if "optimal" in methods or "optimal-mp" in methods or "oblivious-opt" in methods:
         opt = optimal()
     if "param-search" in methods:
         opr = TopoOperator(node_num)
@@ -134,6 +135,16 @@ def main():
         costs_opt_mp = np.array(costs)
         pool.close()
         pool.join()
+    elif "oblivious-opt" in methods:
+        demand = np.zeros((n_nodes,n_nodes),np.float32)
+        for i_iter in range(n_iters):
+            damand += dataset[i_iter]
+        demand /= n_iters
+        degree = Max_degree * np.ones((node_num,), dtype=np.float32)
+        cost_obl, graph_obl = opt.optimal_topology(node_num, demand, degree)
+        cost = cost/(sum(sum(demand)))  
+        print(graph_obl)
+        print("N={0} cost={1}".format(node_num, cost_obl))
     else:
         # start testing
         for i_iter in range(n_iters):
@@ -221,7 +232,16 @@ def main():
                 cost_rl = compute_reward(state_rl, node_num, demand, degree)
                 costs_rl.append(cost_rl)
                 print("RL: {}".format(cost_rl))
-        
+
+            if "oblivious" in methods:
+                state_ob = np.zeros((n_nodes,n_nodes))
+                for i in range(n_nodes):
+                    for j in range(n_nodes):
+                        if (j-i)%n_nodes == 1 or (j-i)%n_nodes == 2 or (i-j)%n_nodes == 1 or (i-j)%n_nodes == 2:
+                            state_ob[i,j] = 1
+                cost_ob = compute_reward(state_ob, node_num, demand, degree)
+                costs_ob.append(cost_ob)
+                print("oblivious: {}".format(cost_ob))
         ## test supervised learning
         #obs = env.reset(demand=demand,degree=degree,provide=True)
         #demand_input, adj_input, deg_input = obs_process(obs, node_num)
@@ -279,6 +299,8 @@ def main():
         print("search  : {0}  std : {1}".format(np.mean(costs_search),np.std(costs_search)))
     if "rl" in methods:
         print("RL      : {0}  std : {1}".format(np.mean(costs_rl),np.std(costs_rl)))
+    if "oblivious" in methods:
+        print("oblivious:{0}  std : {1}".format(np.mean(costs_ob),np.std(costs_ob)))
     print("testing time : {} s".format(t_end-t_begin))
     
     

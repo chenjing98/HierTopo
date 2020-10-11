@@ -9,10 +9,10 @@ from permatch import permatch
 from timeit import default_timer as timer
 
 k = 3
-n_nodes = 50
-n_nodes_param = 12
-n_iters = 12
-n_iters_param = 12
+n_nodes = 15
+n_nodes_param = 15
+n_iters = 15
+n_iters_param = 15
 degree_lim = 4
 desired_output = 0.99
 parallelism = 10
@@ -48,7 +48,7 @@ elif data_source == "scratch":
     node_num = n_nodes
     n_testings = 1000
     #n_iters = int(n_nodes*(n_nodes-1)/2)
-    file_demand = '../../data/2000_{0}_{1}_logistic.pk3'.format(n_nodes, degree_lim)
+    file_demand = '../../data/10000_{0}_{1}_logistic.pk3'.format(n_nodes, degree_lim)
 else:
     print("data_source {} unrecognized.".format(data_source))
     exit(1)
@@ -267,8 +267,13 @@ def apply_policy_replace_nsquare_list(demand, alpha):
             v = cal_v(demand, alpha, adj)
             del remaining_choices[curr_e_num]
             dif_e = cal_diff_inrange(v,remaining_choices)
+            continue
+        if len(failed_attempts) > 20:
+            del remaining_choices[curr_e_num]
+            del dif_e[curr_e_num]
+            continue
         # need to remove some edges
-        elif degree[v1] >= degree_lim and degree[v2] >= degree_lim:
+        if degree[v1] >= degree_lim and degree[v2] >= degree_lim:
             v1_neighbor = [n for n in graph.neighbors(v1)]
             v1_edges = np.where(np.array(v1_neighbor) > v1, v1 * node_num + np.array(v1_neighbor), np.array(v1_neighbor) * node_num + v1).tolist()
             dif_v1 = cal_diff_inrange(v, v1_edges)
@@ -289,7 +294,6 @@ def apply_policy_replace_nsquare_list(demand, alpha):
             adj_rp[e2_rm%node_num,int(e2_rm/node_num)] = 0
             adj_rp[v1,v2] = 1
             adj_rp[v2,v1] = 1
-
             v_rp = cal_v(demand, alpha, adj_rp)
             if max(dif_e) + sum(cal_diff_inrange(v,rm_inds)) > sum(cal_diff_inrange(v_rp,[curr_e])) + sum(cal_diff_inrange(v_rp, rm_inds)):
                 graph.remove_edge(int(e1_rm/node_num),e1_rm%node_num)
@@ -356,7 +360,6 @@ def apply_policy_replace_nsquare_list(demand, alpha):
                 failed_attempts.append(curr_e)
                 del remaining_choices[curr_e_num]
                 del dif_e[curr_e_num]
-
     #print(graph.number_of_edges())
     path_length = cal_pathlength(demand, graph)
     return path_length
@@ -401,6 +404,12 @@ def test_robust(solution, test_size):
     output_std = np.std(metrics)
     return output, output_std
 
+def test_mp(solution, test_size):
+    if adding_mode == "add":
+        func = apply_policy
+    else:
+        func = apply_policy_replace_nsquare_list
+    
 t_begin = timer()
 pred, pred_std = test_robust(solution, n_testings)
 t_end = timer()
