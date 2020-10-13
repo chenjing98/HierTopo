@@ -4,19 +4,17 @@ import copy
 import random
 import numpy as np
 import networkx as nx
-import multiprocessing
+from multiprocessing import Pool
 from permatch import permatch
 from timeit import default_timer as timer
 
 k = 3
-n_nodes = 15
+n_nodes = 28
 n_nodes_param = 15
-n_iters = 15
+n_iters = 22
 n_iters_param = 15
 degree_lim = 4
-desired_output = 0.99
 parallelism = 10
-n_steps = 4
 
 max_steps = int(n_nodes*degree_lim/2)
 max_pos = int(n_nodes*(n_nodes-1)/2)
@@ -48,7 +46,7 @@ elif data_source == "scratch":
     node_num = n_nodes
     n_testings = 1000
     #n_iters = int(n_nodes*(n_nodes-1)/2)
-    file_demand = '../../data/10000_{0}_{1}_logistic.pk3'.format(n_nodes, degree_lim)
+    file_demand = '../../data/2000_{0}_{1}_logistic.pk3'.format(n_nodes, degree_lim)
 else:
     print("data_source {} unrecognized.".format(data_source))
     exit(1)
@@ -106,6 +104,8 @@ def apply_policy(demand, alpha):
     n_nodes = node_num
     graph = nx.Graph()
     graph.add_nodes_from(list(range(n_nodes)))
+    #graph = nx.from_dict_of_dicts(dataset_topo)
+
     adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
     degree = np.sum(adj, axis=-1)
 
@@ -364,6 +364,139 @@ def apply_policy_replace_nsquare_list(demand, alpha):
     path_length = cal_pathlength(demand, graph)
     return path_length
 
+
+def apply_policy_replace_run(params):
+    demand = params["demand"]
+    alpha = params["alpha"]
+    graph = nx.Graph()
+    graph.add_nodes_from(list(range(node_num)))
+    adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
+    #adj = permatch_model.matching(demand, np.ones((node_num,)) * (degree_lim-1))
+    #graph = nx.from_numpy_matrix(adj)
+    degree = np.sum(adj, axis=-1)
+    
+    remaining_choices = []
+    for i in range(node_num-1):
+        for j in range(i+1,node_num):
+            remaining_choices.append(i*node_num+j)
+    rm_inds = []
+    failed_attempts = []
+
+    v = cal_v(demand, alpha, adj)
+    dif_e = cal_diff_inrange(v,remaining_choices)
+    while remaining_choices:
+        curr_e_num = dif_e.index(max(dif_e))
+        curr_e = remaining_choices[curr_e_num]
+        v1 = int(curr_e/node_num)
+        v2 = curr_e % node_num
+        if adj[v1,v2] == 1:
+            del remaining_choices[curr_e_num]
+            del dif_e[curr_e_num]
+            continue
+        if degree[v1] < degree_lim and degree[v2] < degree_lim:
+            graph.add_edge(v1,v2)
+            adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
+            degree = np.sum(adj, axis=-1)
+            v = cal_v(demand, alpha, adj)
+            del remaining_choices[curr_e_num]
+            dif_e = cal_diff_inrange(v,remaining_choices)
+            continue
+        if len(failed_attempts) > 20:
+            del remaining_choices[curr_e_num]
+            del dif_e[curr_e_num]
+            continue
+        # need to remove some edges
+        if degree[v1] >= degree_lim and degree[v2] >= degree_lim:
+            v1_neighbor = [n for n in graph.neighbors(v1)]
+            v1_edges = np.where(np.array(v1_neighbor) > v1, v1 * node_num + np.array(v1_neighbor), np.array(v1_neighbor) * node_num + v1).tolist()
+            dif_v1 = cal_diff_inrange(v, v1_edges)
+            v1_e_num = dif_v1.index(min(dif_v1))
+            e1_rm = v1_edges[v1_e_num]
+
+            v2_neighbor = [n for n in graph.neighbors(v2)]
+            v2_edges = np.where(np.array(v2_neighbor) > v2, v2 * node_num + np.array(v2_neighbor), np.array(v2_neighbor) * node_num + v2).tolist()
+            dif_v2 = cal_diff_inrange(v, v2_edges)
+            v2_e_num = dif_v2.index(min(dif_v2))
+            e2_rm = v2_edges[v2_e_num]
+
+            rm_inds = [e1_rm, e2_rm]
+            adj_rp = copy.deepcopy(adj)
+            adj_rp[int(e1_rm/node_num),e1_rm%node_num] = 0
+            adj_rp[e1_rm%node_num,int(e1_rm/node_num)] = 0
+            adj_rp[int(e2_rm/node_num),e2_rm%node_num] = 0
+            adj_rp[e2_rm%node_num,int(e2_rm/node_num)] = 0
+            adj_rp[v1,v2] = 1
+            adj_rp[v2,v1] = 1
+            v_rp = cal_v(demand, alpha, adj_rp)
+            if max(dif_e) + sum(cal_diff_inrange(v,rm_inds)) > sum(cal_diff_inrange(v_rp,[curr_e])) + sum(cal_diff_inrange(v_rp, rm_inds)):
+                graph.remove_edge(int(e1_rm/node_num),e1_rm%node_num)
+                graph.remove_edge(int(e2_rm/node_num),e2_rm%node_num)
+                graph.add_edge(v1,v2)
+                adj = adj_rp
+                degree = np.sum(adj, axis=-1)
+                v = v_rp
+                del remaining_choices[curr_e_num]
+                dif_e = cal_diff_inrange(v,remaining_choices)
+            else:
+                failed_attempts.append(curr_e)
+                del remaining_choices[curr_e_num]
+                del dif_e[curr_e_num]
+        elif degree[v1] >= degree_lim:
+            v1_neighbor = [n for n in graph.neighbors(v1)]
+            v1_edges = np.where(np.array(v1_neighbor) > v1, v1 * node_num + np.array(v1_neighbor), np.array(v1_neighbor) * node_num + v1).tolist()
+            dif_v1 = cal_diff_inrange(v, v1_edges)
+            v1_e_num = dif_v1.index(min(dif_v1))
+            e1_rm = v1_edges[v1_e_num]
+            rm_inds.append(e1_rm)
+            adj_rp = copy.deepcopy(adj)
+            adj_rp[int(e1_rm/node_num),e1_rm%node_num] = 0
+            adj_rp[e1_rm%node_num,int(e1_rm/node_num)] = 0
+            adj_rp[v1,v2] = 1
+            adj_rp[v2,v1] = 1
+            v_rp = cal_v(demand, alpha, adj_rp)
+            if max(dif_e) + sum(cal_diff_inrange(v,rm_inds)) > sum(cal_diff_inrange(v_rp,[curr_e])) + sum(cal_diff_inrange(v_rp, rm_inds)):
+                graph.remove_edge(int(e1_rm/node_num),e1_rm%node_num)
+                graph.add_edge(v1,v2)
+                adj = adj_rp
+                degree = np.sum(adj, axis=-1)
+                v = v_rp
+                del remaining_choices[curr_e_num]
+                dif_e = cal_diff_inrange(v,remaining_choices)
+                rm_inds = []
+            else:
+                failed_attempts.append(curr_e)
+                del remaining_choices[curr_e_num]
+                del dif_e[curr_e_num]
+        else:
+            v2_neighbor = [n for n in graph.neighbors(v2)]
+            v2_edges = np.where(np.array(v2_neighbor) > v2, v2 * node_num + np.array(v2_neighbor), np.array(v2_neighbor) * node_num + v2).tolist()
+            dif_v2 = cal_diff_inrange(v, v2_edges)
+            v2_e_num = dif_v2.index(min(dif_v2))
+            e2_rm = v2_edges[v2_e_num]
+            rm_inds.append(e2_rm)
+            adj_rp = copy.deepcopy(adj)
+            adj_rp[int(e2_rm/node_num),e2_rm%node_num] = 0
+            adj_rp[e2_rm%node_num,int(e2_rm/node_num)] = 0
+            adj_rp[v1,v2] = 1
+            adj_rp[v2,v1] = 1
+            v_rp = cal_v(demand, alpha, adj_rp)
+            if max(dif_e) + sum(cal_diff_inrange(v,rm_inds)) > sum(cal_diff_inrange(v_rp,[curr_e])) + sum(cal_diff_inrange(v_rp, rm_inds)):
+                graph.remove_edge(int(e2_rm/node_num),e2_rm%node_num)
+                graph.add_edge(v1,v2)
+                adj = adj_rp
+                degree = np.sum(adj, axis=-1)
+                v = v_rp
+                del remaining_choices[curr_e_num]
+                dif_e = cal_diff_inrange(v,remaining_choices)
+                rm_inds = []
+            else:
+                failed_attempts.append(curr_e)
+                del remaining_choices[curr_e_num]
+                del dif_e[curr_e_num]
+    #print(graph.number_of_edges())
+    return graph
+
+
 def cal_diff_inrange(v, edges):
     dif = []
     for i in range(len(edges)):
@@ -405,12 +538,48 @@ def test_robust(solution, test_size):
     return output, output_std
 
 def test_mp(solution, test_size):
-    if adding_mode == "add":
-        func = apply_policy
-    else:
-        func = apply_policy_replace_nsquare_list
-    
+    params = []
+    metrics = []
+    t0 = timer()
+    for i in range(test_size):
+        param = {}
+        param["demand"] = dataset[i]
+        param["alpha"] = solution
+        params.append(param)
+    pool = Pool()
+    graphs = pool.map(apply_policy_replace_run, params)
+    pool.close()
+    pool.join()
+    t1 = timer()
+    print("Decision Time {}".format(t1-t0))
+    for i in range(test_size):
+        m = cal_pathlength(dataset[i], graphs[i])
+        metrics.append(m)
+    output = np.mean(metrics)
+    output_std = np.std(metrics)
+    return output, output_std
+
+"""
+def test_oblivious(solution, test_size):
+    metrics = []
+    demand = np.zeros((n_nodes,n_nodes),np.float32)
+    for i_iter in range(test_size):
+        demand += dataset[i_iter]
+    demand /= test_size
+    graph = apply_policy_replace_graph(demand, solution)
+    graph_adj = np.array(nx.adjacency_matrix(graph).todense(),np.int8)
+    with open("./adj_oblivious.pkl","wb") as f:
+        pk.dump(graph_adj,f)
+    for i in range(test_size):
+        m = cal_pathlength(dataset[i], graph)
+        metrics.append(m)
+        #print("[No. {0}] {1}".format(i,m))
+    output = np.mean(metrics)
+    output_std = np.std(metrics)
+    return output, output_std
+"""
+
 t_begin = timer()
-pred, pred_std = test_robust(solution, n_testings)
+pred, pred_std = test_mp(solution, n_testings)
 t_end = timer()
 print("Prediction = {0}, std = {1}, test_time for {2} samples = {3}s".format(pred, pred_std, n_testings,t_end-t_begin))

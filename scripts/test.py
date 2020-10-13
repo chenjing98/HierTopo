@@ -138,7 +138,7 @@ def main():
     elif "oblivious-opt" in methods:
         demand = np.zeros((n_nodes,n_nodes),np.float32)
         for i_iter in range(n_iters):
-            damand += dataset[i_iter]
+            demand += dataset[i_iter]
         demand /= n_iters
         degree = Max_degree * np.ones((node_num,), dtype=np.float32)
         cost_obl, graph_obl = opt.optimal_topology(node_num, demand, degree)

@@ -4,7 +4,7 @@ import math
 
 # Set parameters
 data_count = 2000
-num_nodes = 40
+num_nodes = 28
 max_degree = 4
 distribution = 'logistic'
 file_name = '../../data/{0}_{1}_{2}_{3}.pk3'.format(data_count, num_nodes, max_degree, distribution)
