@@ -17,11 +17,11 @@ Given the following function:
     where y gets its minimum
 What are the best values for the weights (alpha)?
 """
-k = 3
-n_iters = 30
+k = 1
+n_iters = 12
 degree_lim = 4
 n_workers = 12
-node_num = 30
+node_num = 12
 n_testings = 1000
 max_steps = int(node_num*degree_lim/2)
 max_pos = int(node_num*(node_num-1)/2)
@@ -35,7 +35,7 @@ else:
     file_demand = '../../data/2000_{0}_{1}_logistic.pk3'.format(node_num, degree_lim)
 file_logging = '../../poly_log/log{0}_{1}_{2}_{3}_same.pkl'.format(node_num,degree_lim,k,n_iters)
 if adding_mode == "replace":
-    file_logging = '../../poly_log/log{0}_{1}_{2}_{3}_same_repl.pkl'.format(node_num,degree_lim,k,n_iters)
+    file_logging = '../../poly_log/log{0}_{1}_{2}_{3}_same_repl_pop10.pkl'.format(node_num,degree_lim,k,n_iters)
 
 print("Settings:\nn_nodes     = {0}\nn_order     = {1}\nn_iters     = {2}\nn_testings  = {3}\nadding_mode = {4}".format(node_num, k, n_iters,n_testings,adding_mode))
 
@@ -516,7 +516,7 @@ num_parents_mating = 7 # Number of solutions to be selected as parents in the ma
 # To prepare the initial population, there are 2 ways:
 # 1) Prepare it yourself and pass it to the initial_population parameter. This way is useful when the user wants to start the genetic algorithm with a custom initial population.
 # 2) Assign valid integer values to the sol_per_pop and num_genes parameters. If the initial_population parameter exists, then the sol_per_pop and num_genes parameters are useless.
-sol_per_pop = 20 # Number of solutions in the population.
+sol_per_pop = 50 # Number of solutions in the population.
 num_genes = 2 * k
 
 init_range_low = -2

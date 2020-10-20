@@ -9,10 +9,10 @@ from permatch import permatch
 from timeit import default_timer as timer
 
 k = 3
-n_nodes = 28
-n_nodes_param = 15
-n_iters = 22
-n_iters_param = 15
+n_nodes = 40
+n_nodes_param = 10
+n_iters = 14
+n_iters_param = 10
 degree_lim = 4
 parallelism = 10
 
