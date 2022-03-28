@@ -7,17 +7,19 @@ from timeit import default_timer as timer
 
 from baseline.ego_tree import ego_tree_unit
 from baseline.permatch import permatch
+from baseline.dijkstra_greedy import DijGreedyAlg
 from whatisoptimal import optimal
 from param_search.OptSearch import TopoOperator, dict2dict, dict2nxdict
 from param_search.plotv import TopoSimulator
 from baseline.bmatching import bMatching
 from multiprocessing import Pool
 
-methods = ["oblivious-opt"] # options: "optimal", "greedy", "egotree", "param-search", "rl", "bmatch", "optimal-mp", "oblivious"
-data_source = "scratch" # options: "random8", "nsfnet", "geant2", "scratch"
+methods = ["greedy", "dijgreedy"]
+# methods = ["oblivious-opt"] # options: "optimal", "greedy", "egotree", "param-search", "rl", "bmatch", "optimal-mp", "oblivious"
+data_source = "scratch" # options: "random8", "nsfnet", "geant2", "germany", "scratch"
 scheme = "complete" # options: "complete", "bysteps"
 Max_degree = 4
-n_steps = 2
+n_steps = 1
 n_nodes = 50
 
 # parameters for "search"
@@ -84,6 +86,7 @@ def main():
     costs_opt = []
     costs_ego = []
     costs_match = []
+    costs_dij = []
     costs_search = []
     costs_rl = []
     costs_b = []
@@ -93,6 +96,8 @@ def main():
     # initialize models
     if "greedy" in methods:
         permatch_model = permatch(node_num)
+    if "dijgreedy" in methods:
+        dijgreedy_model = DijGreedyAlg(node_num, Max_degree)
     if "optimal" in methods or "optimal-mp" in methods or "oblivious-opt" in methods:
         opt = optimal()
     if "param-search" in methods:
@@ -205,6 +210,18 @@ def main():
                 cost_m = compute_reward(state_m, node_num, demand, degree)
                 costs_match.append(cost_m)
                 print("greedy: {}".format(cost_m))
+                
+            if "dijgreedy" in methods:
+                if scheme == "bysteps":
+                    origin_graph = nx.from_dict_of_dicts(topo)
+                    result_graph = dijgreedy_model.topo_nsteps(demand, origin_graph, degree, n_steps)
+                    state_d = np.array(nx.adjacency_matrix(result_graph).todense(), np.float32)
+                if scheme == "complete":
+                    state_d = dijgreedy_model.topo_scratch(demand, degree)
+                cost_d = compute_reward(state_d, node_num, demand, degree)
+                costs_dij.append(cost_d)
+                print("dijkstra greedy: {}".format(cost_d))
+                
 
             if "param-search" in methods:
                 curr_graph = topo
@@ -291,6 +308,8 @@ def main():
         print("optimal : {0}  std : {1}".format(np.mean(costs_opt_mp),np.std(costs_opt_mp)))
     if "greedy" in methods:
         print("greedy  : {0}  std : {1}".format(np.mean(costs_match),np.std(costs_match)))
+    if "dijgreedy" in methods:
+        print("dijkstra greedy  : {0}  std : {1}".format(np.mean(costs_dij),np.std(costs_dij)))
     if "egotree" in methods:
         print("egotree : {0}  std : {1}".format(np.mean(costs_ego),np.std(costs_ego)))
     if "bmatch" in methods:

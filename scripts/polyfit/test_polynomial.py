@@ -9,7 +9,7 @@ from permatch import permatch
 from timeit import default_timer as timer
 
 k = 3
-n_nodes = 40
+n_nodes = 30
 n_nodes_param = 10
 n_iters = 14
 n_iters_param = 10
@@ -538,6 +538,7 @@ def test_robust(solution, test_size):
     return output, output_std
 
 def test_mp(solution, test_size):
+    # Run the test parallelly
     params = []
     metrics = []
     t0 = timer()
