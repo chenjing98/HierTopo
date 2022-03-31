@@ -1,12 +1,15 @@
-import pickle as pk
-import itertools
 import copy
-import random
+import pickle as pk
+
 import numpy as np
+import random
+import itertools
 import networkx as nx
+
 from multiprocessing import Pool
-from permatch import permatch
 from timeit import default_timer as timer
+
+from permatch import permatch
 
 k = 3
 n_nodes = 30
@@ -14,11 +17,10 @@ n_nodes_param = 10
 n_iters = 14
 n_iters_param = 10
 degree_lim = 4
-parallelism = 10
+NUM_PARALLEL = 10
 
-max_steps = int(n_nodes*degree_lim/2)
-max_pos = int(n_nodes*(n_nodes-1)/2)
-max_adjust_steps = 20
+MAX_STEPS = int(n_nodes*degree_lim/2)
+MAX_STEPS_REAL = 20
 
 adding_mode = "replace"
 
@@ -110,7 +112,7 @@ def apply_policy(demand, alpha):
     degree = np.sum(adj, axis=-1)
 
     z = np.zeros((n_nodes,n_nodes), np.float32)
-    for _ in range(max_steps):
+    for _ in range(MAX_STEPS):
         #x = np.sum(demand, axis=0)
         x = demand/np.max(demand)*2 - 1 # [N]
         x = x.T
@@ -166,7 +168,7 @@ def apply_policy_replace(demand, alpha):
     degree = np.sum(adj, axis=-1)
 
     z = np.zeros((n_nodes,n_nodes), np.float32)
-    for s in range(max_adjust_steps):
+    for s in range(MAX_STEPS_REAL):
         x = demand/np.max(demand)*2 - 1 # [N]
         x = x.T
         for i in range(n_iters):
@@ -228,7 +230,7 @@ def apply_policy_replace(demand, alpha):
         adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
         degree = np.sum(adj, axis=-1)
     
-    if s == max_adjust_steps - 1:
+    if s == MAX_STEPS_REAL - 1:
         print("Unwillingly terminated.")    
     
     path_length = cal_pathlength(demand, graph)
