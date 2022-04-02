@@ -430,7 +430,10 @@ class HierTopoPolyn(object):
         adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
         v = self.cal_v(demand, alpha, adj)
         dif_e = self.cal_diff_in_range(v, cand)
-        
+        e_idx = dif_e.index(max(dif_e))
+        e = cand[e_idx]
+        while True:
+            pass
     
     def single_move_w_replace(self):
         pass
