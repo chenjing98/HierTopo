@@ -95,6 +95,82 @@ class DijGreedyAlg (object):
         return new_graph
     
     
+    def single_move_wo_replace(self, demand, graph, degree, cand):
+        """
+        @param cand: list of position candidates.
+        @return: is_end: bool, whether the topology adjustment ends
+        @return: n1
+        @return: n2
+        @return: cand_r: list of updated candidates
+        """
+        demand_vec = []
+        for i in range(self.n_nodes - 1):
+            for j in range(i + 1, self.n_nodes):
+                demand_vec.append(demand[i,j] + demand[j,i])
+        plen_vec = self.update_plen(graph)
+        crit_vec = []
+        for i in range(int(self.n_nodes * (self.n_nodes - 1) / 2)):
+            if i in cand:
+                crit_vec.append(demand_vec[i] * plen_vec[i])
+            else:
+                crit_vec.append(-demand_vec[i] * plen_vec[i])
+        cand_r = copy.deepcopy(cand)
+        
+        while True:
+            if max(crit_vec) <= 0:
+                return True, 0, 0, cand_r
+            
+            e = crit_vec.index(max(crit_vec))
+            n = self.edge_to_node(e)
+            n1 = n[0]
+            n2 = n[1]
+            if degree[n1] > 0 and degree[n2] > 0:
+                return False, n1, n2, cand_r
+            else:
+                crit_vec[e] = - crit_vec[e]
+                del cand_r[e]
+             
+             
+    def single_move_w_replace(self, demand, graph, degree, cand):
+        """
+        @param cand: list of position candidates.
+        @return: is_end: bool, whether the topology adjustment ends
+        @return: n1
+        @return: n2
+        @return: cand_r: list of updated candidates
+        """
+        demand_vec = []
+        for i in range(self.n_nodes - 1):
+            for j in range(i + 1, self.n_nodes):
+                demand_vec.append(demand[i,j] + demand[j,i])
+        plen_vec = self.update_plen(graph)
+        crit_vec = []
+        for i in range(int(self.n_nodes * (self.n_nodes - 1) / 2)):
+            if i in cand:
+                crit_vec.append(demand_vec[i] * plen_vec[i])
+            else:
+                crit_vec.append(-demand_vec[i] * plen_vec[i])
+        cand_r = copy.deepcopy(cand)
+        
+        while True:
+            if max(crit_vec) <= 0:
+                return True, 0, 0, cand_r
+            
+            e = crit_vec.index(max(crit_vec))
+            n = self.edge_to_node(e)
+            n1 = n[0]
+            n2 = n[1]
+            if degree[n1] > 0 and degree[n2] > 0:
+                return False, n1, n2, cand_r
+            else:
+                # TODO: consider e's neighbors
+                if degree[n1] <= 0:
+                    pass
+                crit_vec[e] = - crit_vec[e]
+                del cand_r[e]
+                
+    
+    
     def update_plen(self, graph):
         plen_vec = []
         for i in range(self.n_nodes - 1):

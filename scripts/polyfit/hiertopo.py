@@ -426,7 +426,15 @@ class HierTopoPolyn(object):
         #print(graph.number_of_edges())
         return G
     
+    def single_move_wo_replace(self, demand, graph, degree, cand, alpha):
+        adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
+        v = self.cal_v(demand, alpha, adj)
+        dif_e = self.cal_diff_in_range(v, cand)
+        
     
+    def single_move_w_replace(self):
+        pass
+        
     def cal_pathlength(self, demand, graph):
         n_node = demand.shape[0]
         score = 0
