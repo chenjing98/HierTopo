@@ -9,7 +9,7 @@ Detailed documentation and instructions on this repo will be updated soon.
 - Python 3.6
 Run the following in Anaconda environment to install required packages
 ```
-conda install numpy, scipy
+conda install numpy scipy
 pip3 install pygad
 pip3 install networkx
 ``` 
