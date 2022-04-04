@@ -98,8 +98,7 @@ class DijGreedyAlg(object):
         """
         @param cand: list of position candidates.
         @return: is_end: bool, whether the topology adjustment ends
-        @return: n0
-        @return: n1
+        @return: e
         @return: cand_r: list of updated candidates
         """
         demand_vec = []
@@ -117,14 +116,14 @@ class DijGreedyAlg(object):
 
         while True:
             if max(crit_vec) <= 0 or len(cand_r) == 0:
-                return True, 0, 0, cand_r
+                return True, 0, cand_r
 
             e = crit_vec.index(max(crit_vec))
             n = self.edge_to_node(e)
             n0 = n[0]
             n1 = n[1]
             if degree[n0] > 0 and degree[n1] > 0:
-                return False, n0, n1, cand_r
+                return False, e, cand_r
             else:
                 crit_vec[e] = -crit_vec[e]
                 del cand_r[e]
@@ -133,8 +132,7 @@ class DijGreedyAlg(object):
         """
         @param cand: list of position candidates.
         @return: is_end: bool, whether the topology adjustment ends
-        @return: n1
-        @return: n2
+        @return: e
         @return: cand_r: list of updated candidates
         """
         demand_vec = []
@@ -152,14 +150,14 @@ class DijGreedyAlg(object):
 
         while True:
             if max(crit_vec) <= 0:
-                return True, 0, 0, cand_r
+                return True, 0, cand_r
 
             e = crit_vec.index(max(crit_vec))
             n = self.edge_to_node(e)
             n1 = n[0]
             n2 = n[1]
             if degree[n1] > 0 and degree[n2] > 0:
-                return False, n1, n2, cand_r
+                return False, e, cand_r
             else:
                 # TODO: consider e's neighbors
                 if degree[n1] <= 0:
