@@ -23,7 +23,8 @@ class SafeHierTopoAlg(object):
         self.rgreedy_model = DijGreedyAlg(n_node, n_degree)
 
         self.cntr = 0
-        self.period = 5
+        self.period = 1
+        self.step = 0
 
     def single_move(self, demand, graph, cand_ht, cand_rg, alpha, is_verbose):
         is_end_ht, e_ht, cand_ht_m = self.hiertopo_model.single_move_wo_replace(
@@ -65,7 +66,7 @@ class SafeHierTopoAlg(object):
         if is_end_ht and is_end_rg:
             return True, 0, cand_ht, cand_rg
         if is_end_ht:
-            return True, 0, cand_ht, cand_rg
+            return False, e_rg, cand_ht, cand_rg
         if is_end_rg:
             return False, e_ht, cand_ht, cand_rg
 
@@ -78,7 +79,7 @@ class SafeHierTopoAlg(object):
             if e_ht in cand_ht:
                 e_idx = cand_ht.index(e_ht)
                 del cand_ht[e_idx]
-            return True, e_ht, cand_ht, cand_rg
+            return False, e_ht, cand_ht, cand_rg
         else:
             # use routing-greedy decision:
             if e_rg in cand_rg:
@@ -87,7 +88,7 @@ class SafeHierTopoAlg(object):
             if e_rg in cand_ht:
                 e_idx = cand_ht.index(e_rg)
                 del cand_ht[e_idx]
-            return True, e_rg, cand_ht, cand_rg
+            return False, e_rg, cand_ht, cand_rg
 
     def run(self, params, is_verbose=False):
         demand = params["demand"]

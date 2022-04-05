@@ -481,6 +481,8 @@ class HierTopoPolynAlg(object):
         return G
 
     def single_move_wo_replace(self, demand, graph, cand, alpha):
+        if len(cand) == 0:
+            return True, 0 , cand
         adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
         cand_r = copy.deepcopy(cand)
         v = self.cal_v(demand, alpha, adj)
@@ -491,11 +493,11 @@ class HierTopoPolynAlg(object):
         n0 = n[0]
         n1 = n[1]
         while True:
-            if graph.degree(n0) >= self.n_degree and graph.degree(n1) >= self.n_degree:
-                return False, n0, n1, cand_r
+            if graph.degree(n0) < self.n_degree and graph.degree(n1) < self.n_degree:
+                return False, e, cand_r
             del cand_r[e_idx]
             if len(cand_r) == 0:
-                return True, 0, 0, cand_r
+                return True, 0, cand_r
             v = self.cal_v(demand, alpha, adj)
             dif_e = self.cal_diff_in_range(v, cand_r)
             e_idx = dif_e.index(max(dif_e))
@@ -568,10 +570,9 @@ class HierTopoPolynAlg(object):
         return v
 
     def edge_to_node(self, e):
-        for i in range(self.n_nodes - 1):
-            for j in range(i + 1, self.n_nodes):
-                if ((i * (2 * self.n_nodes - 1 - i) / 2 - 1 + j - i) == e):
-                    return [i, j]
+        v1 = np.floor(e / self.n_node)
+        v2 = e - v1 * self.n_node
+        return [v1, v2]
 
 
 def test_robust(solution, test_size, dataset, n_node, n_degree, n_iter,

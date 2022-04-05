@@ -122,11 +122,13 @@ class DijGreedyAlg(object):
             n = self.edge_to_node(e)
             n0 = n[0]
             n1 = n[1]
-            if graph.degree(n0) >= self.n_degree and graph.degree(n1) >= self.n_degree:
+            if graph.degree(n0) < self.n_degree and graph.degree(n1) < self.n_degree:
                 return False, e, cand_r
             else:
                 crit_vec[e] = -crit_vec[e]
-                del cand_r[e]
+                if e in cand_r:
+                    e_idx = cand_r.index(e)
+                    del cand_r[e_idx]
 
     def single_move_w_replace(self, demand, graph, degree, cand):
         """
@@ -163,7 +165,9 @@ class DijGreedyAlg(object):
                 if degree[n1] <= 0:
                     pass
                 crit_vec[e] = -crit_vec[e]
-                del cand_r[e]
+                if e in cand_r:
+                    e_idx = cand_r.index(e)
+                    del cand_r[e_idx]
 
     def update_plen(self, graph):
         plen_vec = []
