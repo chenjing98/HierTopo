@@ -2,3 +2,4 @@ __pycache__/
 .vscode/
 tensorlog*
 *.zip
+poly_log/
