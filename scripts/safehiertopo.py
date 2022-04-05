@@ -25,18 +25,34 @@ class SafeHierTopoAlg(object):
         self.cntr = 0
         self.period = 5
 
-    def single_move(self, demand, graph, cand_ht, cand_rg, alpha):
+    def single_move(self, demand, graph, cand_ht, cand_rg, alpha, is_verbose):
         is_end_ht, e_ht, cand_ht_m = self.hiertopo_model.single_move_wo_replace(
             demand, graph, cand_ht, alpha)
         is_end_rg, e_rg, cand_rg_m = self.rgreedy_model.single_move_wo_replace(
             demand, graph, cand_rg)
 
+        if is_verbose:
+            print("[Step {0}] [HierTopo] end {1}, edge {2}, candidate {3}".
+                  format(self.step, is_end_ht, e_ht, cand_ht_m))
+            print(
+                "[Step {0}] [RGreedy] end {1}, edge {2}, candidate {3}".format(
+                    self.step, is_end_rg, e_rg, cand_rg_m))
+
         is_end, e, cand_ht_new, cand_rg_new = self.fallback(
             is_end_ht, e_ht, cand_ht_m, is_end_rg, e_rg, cand_rg_m)
+
+        if is_verbose:
+            print(
+                "[Step {0}] [Safe] end {1}, edge {2}, candidate {3}, candidate {4}"
+                .format(self.step, is_end, e, cand_ht_new, cand_rg_new))
 
         if not is_end:
             n = self.hiertopo_model.edge_to_node(e)
             graph.add_edge(n[0], n[1])
+            if is_verbose:
+                print("[Step {0}] Action: ({1}, {2})".format(
+                    self.step, n[0], n[1]))
+            self.step += 1
 
         return is_end, graph, cand_ht_new, cand_rg_new
 
@@ -73,7 +89,7 @@ class SafeHierTopoAlg(object):
                 del cand_ht[e_idx]
             return True, e_rg, cand_ht, cand_rg
 
-    def run(self, params):
+    def run(self, params, is_verbose=False):
         demand = params["demand"]
         alpha = params["alpha"]
         G = nx.Graph()
@@ -93,7 +109,7 @@ class SafeHierTopoAlg(object):
         is_end = False
         while not is_end:
             is_end, G, cand_ht, cand_rg = self.single_move(
-                demand, G, cand_ht, cand_rg, alpha)
+                demand, G, cand_ht, cand_rg, alpha, is_verbose)
 
         return G
 
@@ -144,6 +160,23 @@ def test_mp(solution, test_size, dataset, n_node, n_degree, n_iter, n_maxstep,
     return output, output_std
 
 
+def test_standalone(solution, n_data, dataset, n_node, n_degree, n_iter,
+                    n_maxstep, k, is_verbose):
+    param = {}
+    if n_data < len(dataset):
+        param["demand"] = dataset[n_data]
+    else:
+        param["demand"] = dataset[0]
+    param["alpha"] = solution
+
+    if is_verbose:
+        print("Dataset loaded. Ready to run.")
+    safe_model = SafeHierTopoAlg(n_node, n_degree, n_iter, n_maxstep, k)
+    G = safe_model.run(param, True)
+    h = safe_model.cal_pathlength(param["demand"], G)
+    return h, 0
+
+
 def main():
 
     parser = argparse.ArgumentParser()
@@ -162,6 +195,7 @@ def main():
                         type=int,
                         help="Number of iterations",
                         default=14)
+    parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument(
         "-np",
         "--n_node_param",
@@ -205,6 +239,7 @@ def main():
     n_iters_param = args.n_iter_param
     n_degree = args.n_degree
     n_maxstep = args.max_step
+    is_verbose = args.verbose
 
     ad_scheme = args.ad_scheme
     data_source = args.data_source
@@ -255,6 +290,8 @@ def main():
 
     pred, pred_std = test_mp(solution, n_testings, dataset, n_node, n_degree,
                              n_iter, n_maxstep, k)
+
+    # pred, pred_std = test_standalone(solution, 0, dataset, n_node, n_degree, n_iter, n_maxstep, k, is_verbose)
 
     t_end = timer()
     print(
