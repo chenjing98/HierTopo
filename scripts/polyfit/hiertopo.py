@@ -13,7 +13,7 @@ from timeit import default_timer as timer
 from .permatch import permatch
 
 
-class HierTopoPolyn(object):
+class HierTopoPolynAlg(object):
 
     def __init__(self, n_node, n_degree, n_iter, n_maxstep, k):
         self.n_node = n_node
@@ -578,7 +578,7 @@ def test_robust(solution, test_size, dataset, n_node, n_degree, n_iter,
                 n_maxstep, k, ad_scheme):
     metrics = []
 
-    hiertopo = HierTopoPolyn(n_node, n_degree, n_iter, n_maxstep, k)
+    hiertopo = HierTopoPolynAlg(n_node, n_degree, n_iter, n_maxstep, k)
 
     for i in range(test_size):
         if ad_scheme == "add":
@@ -607,7 +607,7 @@ def test_mp(solution, test_size, dataset, n_node, n_degree, n_iter, n_maxstep,
         param["alpha"] = solution
         params.append(param)
 
-    hiertopo = HierTopoPolyn(n_node, n_degree, n_iter, n_maxstep, k)
+    hiertopo = HierTopoPolynAlg(n_node, n_degree, n_iter, n_maxstep, k)
 
     pool = Pool()
     graphs = pool.map(hiertopo.apply_policy_w_replace_run, params)

@@ -8,7 +8,7 @@ import networkx as nx
 from multiprocessing import Pool
 from timeit import default_timer as timer
 
-from polyfit.hiertopo import HierTopoPolyn
+from polyfit.hiertopo import HierTopoPolynAlg
 from baseline.dijkstra_greedy import DijGreedyAlg
 
 
@@ -18,8 +18,8 @@ class SafeHierTopoAlg(object):
         self.n_node = n_node
         self.n_degree = n_degree
 
-        self.hiertopo_model = HierTopoPolyn(n_node, n_degree, n_iter,
-                                            n_maxstep, k)
+        self.hiertopo_model = HierTopoPolynAlg(n_node, n_degree, n_iter,
+                                               n_maxstep, k)
         self.rgreedy_model = DijGreedyAlg(n_node, n_degree)
 
         self.cntr = 0

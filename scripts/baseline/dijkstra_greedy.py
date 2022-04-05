@@ -7,10 +7,10 @@ import networkx as nx
 
 class DijGreedyAlg(object):
 
-    def __init__(self, n_nodes, max_degree) -> None:
-        self.n_nodes = n_nodes
-        self.max_degree = max_degree
-        self.inf = max(100, n_nodes)
+    def __init__(self, n_node, n_degree) -> None:
+        self.n_node = n_node
+        self.n_degree = n_degree
+        self.inf = max(100, n_node)
 
     def reset(self):
         pass
@@ -18,16 +18,16 @@ class DijGreedyAlg(object):
     def topo_scratch(self, demand, degree):
         allowed_degree = copy.deepcopy(degree)
         demand_vec = []
-        for i in range(self.n_nodes - 1):
-            for j in range(i + 1, self.n_nodes):
+        for i in range(self.n_node - 1):
+            for j in range(i + 1, self.n_node):
                 demand_vec.append(demand[i, j] + demand[j, i])
 
-        state = np.zeros((self.n_nodes, self.n_nodes))
+        state = np.zeros((self.n_node, self.n_node))
         graph = nx.Graph()
-        graph.add_nodes_from(list(range(self.n_nodes)))
+        graph.add_nodes_from(list(range(self.n_node)))
         plen_vec = self.update_plen(graph)
         crit_vec = []
-        for i in range(int(self.n_nodes * (self.n_nodes - 1) / 2)):
+        for i in range(int(self.n_node * (self.n_node - 1) / 2)):
             crit_vec.append(demand_vec[i] * plen_vec[i])
 
         while (True):
@@ -51,7 +51,7 @@ class DijGreedyAlg(object):
                 graph.add_edge(n1, n2)
                 plen_vec = self.update_plen(graph)
             crit_vec = []
-            for i in range(int(self.n_nodes * (self.n_nodes - 1) / 2)):
+            for i in range(int(self.n_node * (self.n_node - 1) / 2)):
                 crit_vec.append(demand_vec[i] * plen_vec[i])
 
         return state
@@ -59,12 +59,12 @@ class DijGreedyAlg(object):
     def topo_nsteps(self, demand, graph, degree, n_steps):
         allowed_degree = copy.deepcopy(degree)
         demand_vec = []
-        for i in range(self.n_nodes - 1):
-            for j in range(i + 1, self.n_nodes):
+        for i in range(self.n_node - 1):
+            for j in range(i + 1, self.n_node):
                 demand_vec.append(demand[i, j] + demand[j, i])
         plen_vec = self.update_plen(graph)
         crit_vec = []
-        for i in range(int(self.n_nodes * (self.n_nodes - 1) / 2)):
+        for i in range(int(self.n_node * (self.n_node - 1) / 2)):
             crit_vec.append(demand_vec[i] * plen_vec[i])
         new_graph = copy.deepcopy(graph)
 
@@ -89,7 +89,7 @@ class DijGreedyAlg(object):
 
                 plen_vec = self.update_plen(new_graph)
                 crit_vec = []
-                for i in range(int(self.n_nodes * (self.n_nodes - 1) / 2)):
+                for i in range(int(self.n_node * (self.n_node - 1) / 2)):
                     crit_vec.append(demand_vec[i] * plen_vec[i])
 
         return new_graph
@@ -102,12 +102,12 @@ class DijGreedyAlg(object):
         @return: cand_r: list of updated candidates
         """
         demand_vec = []
-        for i in range(self.n_nodes - 1):
-            for j in range(i + 1, self.n_nodes):
+        for i in range(self.n_node - 1):
+            for j in range(i + 1, self.n_node):
                 demand_vec.append(demand[i, j] + demand[j, i])
         plen_vec = self.update_plen(graph)
         crit_vec = []
-        for i in range(int(self.n_nodes * (self.n_nodes - 1) / 2)):
+        for i in range(int(self.n_node * (self.n_node - 1) / 2)):
             if i in cand:
                 crit_vec.append(demand_vec[i] * plen_vec[i])
             else:
@@ -136,12 +136,12 @@ class DijGreedyAlg(object):
         @return: cand_r: list of updated candidates
         """
         demand_vec = []
-        for i in range(self.n_nodes - 1):
-            for j in range(i + 1, self.n_nodes):
+        for i in range(self.n_node - 1):
+            for j in range(i + 1, self.n_node):
                 demand_vec.append(demand[i, j] + demand[j, i])
         plen_vec = self.update_plen(graph)
         crit_vec = []
-        for i in range(int(self.n_nodes * (self.n_nodes - 1) / 2)):
+        for i in range(int(self.n_node * (self.n_node - 1) / 2)):
             if i in cand:
                 crit_vec.append(demand_vec[i] * plen_vec[i])
             else:
@@ -167,8 +167,8 @@ class DijGreedyAlg(object):
 
     def update_plen(self, graph):
         plen_vec = []
-        for i in range(self.n_nodes - 1):
-            for j in range(i + 1, self.n_nodes):
+        for i in range(self.n_node - 1):
+            for j in range(i + 1, self.n_node):
                 try:
                     path_length = float(
                         nx.shortest_path_length(graph, source=i, target=j))
@@ -180,7 +180,7 @@ class DijGreedyAlg(object):
 
     #the order of edge ---> the order of two nodes
     def edge_to_node(self, e):
-        for i in range(self.n_nodes - 1):
-            for j in range(i + 1, self.n_nodes):
-                if ((i * (2 * self.n_nodes - 1 - i) / 2 - 1 + j - i) == e):
+        for i in range(self.n_node - 1):
+            for j in range(i + 1, self.n_node):
+                if ((i * (2 * self.n_node - 1 - i) / 2 - 1 + j - i) == e):
                     return [i, j]
