@@ -94,7 +94,7 @@ class DijGreedyAlg(object):
 
         return new_graph
 
-    def single_move_wo_replace(self, demand, graph, degree, cand):
+    def single_move_wo_replace(self, demand, graph, cand):
         """
         @param cand: list of position candidates.
         @return: is_end: bool, whether the topology adjustment ends
@@ -122,7 +122,7 @@ class DijGreedyAlg(object):
             n = self.edge_to_node(e)
             n0 = n[0]
             n1 = n[1]
-            if degree[n0] > 0 and degree[n1] > 0:
+            if graph.degree(n0) >= self.n_degree and graph.degree(n1) >= self.n_degree:
                 return False, e, cand_r
             else:
                 crit_vec[e] = -crit_vec[e]

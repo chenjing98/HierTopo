@@ -481,7 +481,7 @@ class HierTopoPolyn(object):
         #print(graph.number_of_edges())
         return G
 
-    def single_move_wo_replace(self, demand, graph, degree, cand, alpha):
+    def single_move_wo_replace(self, demand, graph, cand, alpha):
         adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
         cand_r = copy.deepcopy(cand)
         v = self.cal_v(demand, alpha, adj)
@@ -492,7 +492,7 @@ class HierTopoPolyn(object):
         n0 = n[0]
         n1 = n[1]
         while True:
-            if degree[n0] > 0 and degree[n1] > 0:
+            if graph.degree(n0) >= self.n_degree and graph.degree(n1) >= self.n_degree:
                 return False, n0, n1, cand_r
             del cand_r[e_idx]
             if len(cand_r) == 0:
