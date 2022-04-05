@@ -1,5 +1,4 @@
 import copy
-from optparse import Option
 import pickle as pk
 import argparse
 
@@ -11,7 +10,7 @@ import networkx as nx
 from multiprocessing import Pool
 from timeit import default_timer as timer
 
-from permatch import permatch
+from .permatch import permatch
 
 
 class HierTopoPolyn(object):
