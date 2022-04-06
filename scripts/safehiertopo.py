@@ -2,6 +2,7 @@ import argparse
 import pickle as pk
 
 import numpy as np
+import copy
 import itertools
 import networkx as nx
 
@@ -73,27 +74,29 @@ class SafeHierTopoAlg(object):
         if is_end_rg:
             return False, e_ht, cand_ht, cand_rg
 
+        cand_ht_new = copy.deepcopy(cand_ht)
+        cand_rg_new = copy.deepcopy(cand_rg)
         # both algorithm has normal output
         if self.cntr % self.period == 0:
             self.cntr += 1
             # use Hiertopo's decision
-            if e_ht in cand_rg:
-                e_idx = cand_rg.index(e_ht)
-                del cand_rg[e_idx]
-            if e_ht in cand_ht:
-                e_idx = cand_ht.index(e_ht)
-                del cand_ht[e_idx]
-            return False, e_ht, cand_ht, cand_rg
+            if e_ht in cand_rg_new:
+                e_idx = cand_rg_new.index(e_ht)
+                del cand_rg_new[e_idx]
+            if e_ht in cand_ht_new:
+                e_idx = cand_ht_new.index(e_ht)
+                del cand_ht_new[e_idx]
+            return False, e_ht, cand_ht_new, cand_rg_new
         else:
             self.cntr += 1
             # use routing-greedy decision:
-            if e_rg in cand_rg:
-                e_idx = cand_rg.index(e_rg)
+            if e_rg in cand_rg_new:
+                e_idx = cand_rg_new.index(e_rg)
                 del cand_rg[e_idx]
             if e_rg in cand_ht:
-                e_idx = cand_ht.index(e_rg)
-                del cand_ht[e_idx]
-            return False, e_rg, cand_ht, cand_rg
+                e_idx = cand_ht_new.index(e_rg)
+                del cand_ht_new[e_idx]
+            return False, e_rg, cand_ht_new, cand_rg_new
 
     def run(self, params, is_verbose=False):
         demand = params["demand"]
@@ -306,11 +309,13 @@ def main():
     t_begin = timer()
 
     if is_test:
-        test_data_number = 1
-        n_testings = 1
-        pred, pred_std = test_standalone(solution, test_data_number, dataset,
+        # n_testings = 1
+        # for test_data_number in range(1000):
+        for test_data_number in range(n_testings):
+            pred, pred_std = test_standalone(solution, test_data_number, dataset,
                                          n_node, n_degree, n_iter, n_maxstep,
                                          k, is_verbose)
+            print("[Test {0}] avg {1} std {2}".format(test_data_number, pred, pred_std))
     else:
         pred, pred_std = test_mp(solution, n_testings, dataset, n_node,
                                  n_degree, n_iter, n_maxstep, k, fb_period)
