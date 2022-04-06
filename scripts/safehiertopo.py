@@ -43,13 +43,8 @@ class SafeHierTopoAlg(object):
                 "[Step {0}] [RGreedy] end {1}, edge {2}, candidate {3}".format(
                     self.step, is_end_rg, e_rg, cand_rg_m))
 
-        is_end, e, cand_ht_new, cand_rg_new = self.fallback(
-            is_end_ht, e_ht, cand_ht_m, is_end_rg, e_rg, cand_rg_m)
-
-        if is_verbose:
-            print(
-                "[Step {0}] [Safe] end {1}, edge {2}, candidate {3}, candidate {4}"
-                .format(self.step, is_end, e, cand_ht_new, cand_rg_new))
+        is_end, e = self.fallback(
+            is_end_ht, e_ht, is_end_rg, e_rg)
 
         if not is_end:
             n = self.hiertopo_model.edge_to_node(e)
@@ -58,45 +53,41 @@ class SafeHierTopoAlg(object):
                 print("[Step {0}] Action: ({1}, {2})".format(
                     self.step, n[0], n[1]))
             self.step += 1
+            
+            if e in cand_rg_m:
+                e_idx = cand_rg_m.index(e)
+                del cand_rg_m[e_idx]
+            if e in cand_ht_m:
+                e_idx = cand_ht_m.index(e)
+                del cand_ht_m[e_idx]
+                
+        if is_verbose:
+            print(
+                "[Step {0}] [Safe] end {1}, edge {2}, candidate {3}, candidate {4}"
+                .format(self.step, is_end, e, cand_ht_m, cand_rg_m))
 
-        return is_end, graph, cand_ht_new, cand_rg_new
+        return is_end, graph, cand_ht_m, cand_rg_m
 
-    def fallback(self, is_end_ht, e_ht, cand_ht, is_end_rg, e_rg, cand_rg):
-        return self.fallback_period(is_end_ht, e_ht, cand_ht, is_end_rg, e_rg,
-                                    cand_rg)
+    def fallback(self, is_end_ht, e_ht, is_end_rg, e_rg):
+        return self.fallback_period(is_end_ht, e_ht, is_end_rg, e_rg)
 
-    def fallback_period(self, is_end_ht, e_ht, cand_ht, is_end_rg, e_rg,
-                        cand_rg):
+    def fallback_period(self, is_end_ht, e_ht, is_end_rg, e_rg):
         if is_end_ht and is_end_rg:
-            return True, 0, cand_ht, cand_rg
+            return True, 0
         if is_end_ht:
-            return False, e_rg, cand_ht, cand_rg
+            return False, e_rg
         if is_end_rg:
-            return False, e_ht, cand_ht, cand_rg
+            return False, e_ht
 
-        cand_ht_new = copy.deepcopy(cand_ht)
-        cand_rg_new = copy.deepcopy(cand_rg)
         # both algorithm has normal output
         if self.cntr % self.period == 0:
             self.cntr += 1
             # use Hiertopo's decision
-            if e_ht in cand_rg_new:
-                e_idx = cand_rg_new.index(e_ht)
-                del cand_rg_new[e_idx]
-            if e_ht in cand_ht_new:
-                e_idx = cand_ht_new.index(e_ht)
-                del cand_ht_new[e_idx]
-            return False, e_ht, cand_ht_new, cand_rg_new
+            return False, e_ht
         else:
             self.cntr += 1
             # use routing-greedy decision:
-            if e_rg in cand_rg_new:
-                e_idx = cand_rg_new.index(e_rg)
-                del cand_rg[e_idx]
-            if e_rg in cand_ht:
-                e_idx = cand_ht_new.index(e_rg)
-                del cand_ht_new[e_idx]
-            return False, e_rg, cand_ht_new, cand_rg_new
+            return False, e_rg
 
     def run(self, params, is_verbose=False):
         demand = params["demand"]
@@ -310,8 +301,8 @@ def main():
 
     if is_test:
         # n_testings = 1
-        # for test_data_number in range(1000):
         for test_data_number in range(n_testings):
+        # test_data_number = 106
             pred, pred_std = test_standalone(solution, test_data_number, dataset,
                                          n_node, n_degree, n_iter, n_maxstep,
                                          k, is_verbose)
