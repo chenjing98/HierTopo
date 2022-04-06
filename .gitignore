@@ -3,3 +3,4 @@ __pycache__/
 tensorlog*
 *.zip
 poly_log/
+debug*
