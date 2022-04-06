@@ -6,7 +6,7 @@ import copy
 import itertools
 import networkx as nx
 
-from multiprocessing import Pool
+from multiprocessing import Pool, cpu_count
 from timeit import default_timer as timer
 
 from polyfit.hiertopo import HierTopoPolynAlg
@@ -129,7 +129,7 @@ class SafeHierTopoAlg(object):
 
 
 def test_mp(solution, test_size, dataset, n_node, n_degree, n_iter, n_maxstep,
-            k, period):
+            k, period, n_cpu_limit=cpu_count()):
     # Run the test parallelly
     params = []
     metrics = []
@@ -145,7 +145,7 @@ def test_mp(solution, test_size, dataset, n_node, n_degree, n_iter, n_maxstep,
     safe_model = SafeHierTopoAlg(n_node, n_degree, n_iter, n_maxstep, k)
     safe_model.set_period(period)
 
-    pool = Pool()
+    pool = Pool(processes=n_cpu_limit)
     graphs = pool.map(safe_model.run, params)
     pool.close()
     pool.join()
@@ -223,6 +223,13 @@ def main():
         help=
         "The period of invoking HierTopo during periodical fallback scheme",
         default=5)
+    parser.add_argument(
+        "-c",
+        "--cpulimit",
+        type=int,
+        help=
+        "The limited cpu core count",
+        default=60)
     parser.add_argument("-k",
                         type=int,
                         help="Order of the local policy polynomial",
@@ -309,7 +316,7 @@ def main():
             print("[Test {0}] avg {1} std {2}".format(test_data_number, pred, pred_std))
     else:
         pred, pred_std = test_mp(solution, n_testings, dataset, n_node,
-                                 n_degree, n_iter, n_maxstep, k, fb_period)
+                                 n_degree, n_iter, n_maxstep, k, fb_period, n_cpu_limit=args.cpulimit)
 
     t_end = timer()
     print("[Average Hop] {}".format(pred))

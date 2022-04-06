@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export CORE_COUNT=8
+export CORE_COUNT=60
 
 declare -a nodes=(28 30 35 40 45 50)
 declare degree=(4)
@@ -30,6 +30,7 @@ run() {
     ad_scheme=$8
     k=$9
     filename=${10}
+    core_count=${11}
     if [[ ${ad_scheme} == "add" ]]
     then
         file_solution="../poly_log/log${n_node_param}_${n_degree}_${k}_${n_iter_param}_same.pkl"
@@ -42,7 +43,7 @@ run() {
         return 1
     fi
     
-    output=$(python3 safehiertopo.py -n ${n_node} -d ${n_degree} -i ${n_iter} -np ${n_node_param} -ip ${n_iter_param} -p ${period} -k ${k} -ds ${dataset} -a ${ad_scheme})
+    output=$(python3 safehiertopo.py -n ${n_node} -d ${n_degree} -i ${n_iter} -np ${n_node_param} -ip ${n_iter_param} -p ${period} -k ${k} -ds ${dataset} -a ${ad_scheme} -c ${core_count})
     
     echo $output >> ${filename}.txt
     
@@ -73,7 +74,7 @@ echo Starts at $(date +"%Y-%m-%d %H:%M:%S") > ${filename}.csv
 echo n_node, n_iter, n_node_param, n_iter_param, fallback_period, ad_scheme, hop_avg, hop_std, ttime >> ${filename}.csv
 
 
-parallel -j${CORE_COUNT} run ::: ${nodes[@]} ::: ${degree} ::: ${iter} ::: ${node_param[@]} ::: ${iter_param[@]} ::: ${periods[@]} ::: ${dataset} ::: ${adschemes[@]} ::: ${k} ::: ${filename}
+parallel -j1 run ::: ${nodes[@]} ::: ${degree} ::: ${iter} ::: ${node_param[@]} ::: ${iter_param[@]} ::: ${periods[@]} ::: ${dataset} ::: ${adschemes[@]} ::: ${k} ::: ${filename} ::: ${CORE_COUNT}
 
 
 echo Ends at $(date +"%Y-%m-%d %H:%M:%S") >> ${filename}.txt
