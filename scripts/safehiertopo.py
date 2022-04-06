@@ -72,6 +72,7 @@ class SafeHierTopoAlg(object):
 
         # both algorithm has normal output
         if self.cntr % self.period == 0:
+            self.cntr += 1
             # use Hiertopo's decision
             if e_ht in cand_rg:
                 e_idx = cand_rg.index(e_ht)
@@ -81,6 +82,7 @@ class SafeHierTopoAlg(object):
                 del cand_ht[e_idx]
             return False, e_ht, cand_ht, cand_rg
         else:
+            self.cntr += 1
             # use routing-greedy decision:
             if e_rg in cand_rg:
                 e_idx = cand_rg.index(e_rg)

@@ -498,7 +498,6 @@ class HierTopoPolynAlg(object):
             del cand_r[e_idx]
             if len(cand_r) == 0:
                 return True, 0, cand_r
-            v = self.cal_v(demand, alpha, adj)
             dif_e = self.cal_diff_in_range(v, cand_r)
             e_idx = dif_e.index(max(dif_e))
             e = cand_r[e_idx]
