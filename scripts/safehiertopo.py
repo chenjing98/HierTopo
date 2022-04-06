@@ -23,8 +23,11 @@ class SafeHierTopoAlg(object):
         self.rgreedy_model = DijGreedyAlg(n_node, n_degree)
 
         self.cntr = 0
-        self.period = 1
+        self.period = 5
         self.step = 0
+
+    def set_period(self, period):
+        self.period = period
 
     def single_move(self, demand, graph, cand_ht, cand_rg, alpha, is_verbose):
         is_end_ht, e_ht, cand_ht_m = self.hiertopo_model.single_move_wo_replace(
@@ -132,7 +135,7 @@ class SafeHierTopoAlg(object):
 
 
 def test_mp(solution, test_size, dataset, n_node, n_degree, n_iter, n_maxstep,
-            k):
+            k, period):
     # Run the test parallelly
     params = []
     metrics = []
@@ -146,6 +149,7 @@ def test_mp(solution, test_size, dataset, n_node, n_degree, n_iter, n_maxstep,
         params.append(param)
 
     safe_model = SafeHierTopoAlg(n_node, n_degree, n_iter, n_maxstep, k)
+    safe_model.set_period(period)
 
     pool = Pool()
     graphs = pool.map(safe_model.run, params)
@@ -175,7 +179,7 @@ def test_standalone(solution, n_data, dataset, n_node, n_degree, n_iter,
     if is_verbose:
         print("Dataset loaded. Ready to run.")
     safe_model = SafeHierTopoAlg(n_node, n_degree, n_iter, n_maxstep, k)
-    G = safe_model.run(param, True)
+    G = safe_model.run(param, is_verbose)
     h = safe_model.cal_pathlength(param["demand"], G)
     return h, 0
 
@@ -198,7 +202,8 @@ def main():
                         type=int,
                         help="Number of iterations",
                         default=14)
-    parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument("-v", "--verbose", action='store_true')
+    parser.add_argument("-t", "--test", action='store_true')
     parser.add_argument(
         "-np",
         "--n_node_param",
@@ -217,6 +222,13 @@ def main():
         type=int,
         help="Maximum number of steps before topology adjustement ends",
         default=20)
+    parser.add_argument(
+        "-p",
+        "--period",
+        type=int,
+        help=
+        "The period of invoking HierTopo during periodical fallback scheme",
+        default=5)
     parser.add_argument("-k",
                         type=int,
                         help="Order of the local policy polynomial",
@@ -243,6 +255,8 @@ def main():
     n_degree = args.n_degree
     n_maxstep = args.max_step
     is_verbose = args.verbose
+    is_test = args.test
+    fb_period = args.period
 
     ad_scheme = args.ad_scheme
     data_source = args.data_source
@@ -291,15 +305,21 @@ def main():
     # ============ Start testing ============
     t_begin = timer()
 
-    pred, pred_std = test_mp(solution, n_testings, dataset, n_node, n_degree,
-                             n_iter, n_maxstep, k)
-
-    # pred, pred_std = test_standalone(solution, 0, dataset, n_node, n_degree, n_iter, n_maxstep, k, is_verbose)
+    if is_test:
+        test_data_number = 1
+        n_testings = 1
+        pred, pred_std = test_standalone(solution, test_data_number, dataset,
+                                         n_node, n_degree, n_iter, n_maxstep,
+                                         k, is_verbose)
+    else:
+        pred, pred_std = test_mp(solution, n_testings, dataset, n_node,
+                                 n_degree, n_iter, n_maxstep, k, fb_period)
 
     t_end = timer()
-    print(
-        "Prediction = {0}, std = {1}, test_time for {2} samples = {3}s".format(
-            pred, pred_std, n_testings, t_end - t_begin))
+    print("[Average Hop] {}".format(pred))
+    print("[Standard Deviation Hop] {}".format(pred_std))
+    print("[Average Test Time] {} s".format(
+        (t_end - t_begin) / n_testings))  # in second
 
 
 if __name__ == "__main__":

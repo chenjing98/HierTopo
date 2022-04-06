@@ -4,3 +4,4 @@ tensorlog*
 *.zip
 poly_log/
 debug*
+results/
