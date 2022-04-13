@@ -30,13 +30,11 @@ class SafeHierTopoAlg(object):
     def set_period(self, period):
         self.period = period
 
-    def single_move(self, demand, graph, cand_ht, cand_rg, alpha, is_verbose):
-        is_end_ht, e_ht, cand_ht_m = self.hiertopo_model.single_move_wo_replace(
-            demand, graph, cand_ht, alpha)
+    def single_move(self, demand, graph, cand_ht, cand_rg, alpha, is_w_replace=False, verbose_level=0):
         is_end_rg, e_rg, cand_rg_m = self.rgreedy_model.single_move_wo_replace(
             demand, graph, cand_rg)
 
-        if is_verbose:
+        if verbose_level > 1:
             print("[Step {0}] [HierTopo] end {1}, edge {2}, candidate {3}".
                   format(self.step, is_end_ht, e_ht, cand_ht_m))
             print(
@@ -49,19 +47,19 @@ class SafeHierTopoAlg(object):
         if not is_end:
             n = self.hiertopo_model.edge_to_node(e)
             graph.add_edge(n[0], n[1])
-            if is_verbose:
+            if verbose_level > 0:
                 print("[Step {0}] Action: ({1}, {2})".format(
                     self.step, n[0], n[1]))
             self.step += 1
-            
+
             if e in cand_rg_m:
                 e_idx = cand_rg_m.index(e)
                 del cand_rg_m[e_idx]
             if e in cand_ht_m:
                 e_idx = cand_ht_m.index(e)
                 del cand_ht_m[e_idx]
-                
-        if is_verbose:
+
+        if verbose_level > 1:
             print(
                 "[Step {0}] [Safe] end {1}, edge {2}, candidate {3}, candidate {4}"
                 .format(self.step, is_end, e, cand_ht_m, cand_rg_m))
@@ -89,15 +87,15 @@ class SafeHierTopoAlg(object):
             # use routing-greedy decision:
             return False, e_rg
 
-    def run(self, params, is_verbose=False):
+    def run(self, params, verbose_level=0):
         demand = params["demand"]
         alpha = params["alpha"]
         G = nx.Graph()
         G.add_nodes_from(list(range(self.n_node)))
-        adj = np.array(nx.adjacency_matrix(G).todense(), np.float32)
+        # adj = np.array(nx.adjacency_matrix(G).todense(), np.float32)
         #adj = permatch_model.matching(demand, np.ones((n_node,)) * (n_degree-1))
         #graph = nx.from_numpy_matrix(adj)
-        degree = np.sum(adj, axis=-1)
+        # degree = np.sum(adj, axis=-1)
 
         cand_ht = []
         cand_rg = []
@@ -109,7 +107,7 @@ class SafeHierTopoAlg(object):
         is_end = False
         while not is_end:
             is_end, G, cand_ht, cand_rg = self.single_move(
-                demand, G, cand_ht, cand_rg, alpha, is_verbose)
+                demand, G, cand_ht, cand_rg, alpha, is_w_replace=False, verbose_level=verbose_level)
 
         return G
 
@@ -162,7 +160,7 @@ def test_mp(solution, test_size, dataset, n_node, n_degree, n_iter, n_maxstep,
 
 
 def test_standalone(solution, n_data, dataset, n_node, n_degree, n_iter,
-                    n_maxstep, k, is_verbose):
+                    n_maxstep, k, verbose_level):
     param = {}
     if n_data < len(dataset):
         param["demand"] = dataset[n_data]
@@ -170,10 +168,10 @@ def test_standalone(solution, n_data, dataset, n_node, n_degree, n_iter,
         param["demand"] = dataset[0]
     param["alpha"] = solution
 
-    if is_verbose:
+    if verbose_level > 1:
         print("Dataset loaded. Ready to run.")
     safe_model = SafeHierTopoAlg(n_node, n_degree, n_iter, n_maxstep, k)
-    G = safe_model.run(param, is_verbose)
+    G = safe_model.run(param, verbose_level)
     h = safe_model.cal_pathlength(param["demand"], G)
     return h, 0
 
@@ -196,7 +194,13 @@ def main():
                         type=int,
                         help="Number of iterations",
                         default=14)
-    parser.add_argument("-v", "--verbose", action='store_true')
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        type=int,
+        help=
+        "Level 0: no intermediate log, level 1: action log, level 2: more detailed state log",
+        default=0)
     parser.add_argument("-t", "--test", action='store_true')
     parser.add_argument(
         "-np",
@@ -223,13 +227,11 @@ def main():
         help=
         "The period of invoking HierTopo during periodical fallback scheme",
         default=5)
-    parser.add_argument(
-        "-c",
-        "--cpulimit",
-        type=int,
-        help=
-        "The limited cpu core count",
-        default=60)
+    parser.add_argument("-c",
+                        "--cpulimit",
+                        type=int,
+                        help="The limited cpu core count",
+                        default=60)
     parser.add_argument("-k",
                         type=int,
                         help="Order of the local policy polynomial",
@@ -255,7 +257,7 @@ def main():
     n_iters_param = args.n_iter_param
     n_degree = args.n_degree
     n_maxstep = args.max_step
-    is_verbose = args.verbose
+    verbose_level = args.verbose
     is_test = args.test
     fb_period = args.period
 
