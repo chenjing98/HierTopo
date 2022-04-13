@@ -602,7 +602,7 @@ class HierTopoPolynAlg(object):
         for i in range(len(edges)):
             e = edges[i]
             v1 = int(e / self.n_node)
-            v2 = e % self.n_node
+            v2 = int(e % self.n_node)
             dif.append(np.abs(v[v1] - v[v2]))
         return dif
 
@@ -626,8 +626,8 @@ class HierTopoPolynAlg(object):
         return v
 
     def edge_to_node(self, e):
-        v1 = np.floor(e / self.n_node)
-        v2 = e - v1 * self.n_node
+        v1 = int(np.floor(e / self.n_node))
+        v2 = int(e - v1 * self.n_node)
         return [v1, v2]
 
 
