@@ -30,7 +30,22 @@ class SafeHierTopoAlg(object):
     def set_period(self, period):
         self.period = period
 
-    def single_move(self, demand, graph, cand_ht, cand_rg, alpha, is_w_replace=False, verbose_level=0):
+    def single_move(self,
+                    demand,
+                    graph,
+                    cand_ht,
+                    cand_rg,
+                    alpha,
+                    is_w_replace=False,
+                    verbose_level=0):
+        if is_w_replace:
+            is_end_ht, e_ht, e_rm, cand_ht_m = self.hiertopo_model.single_move_w_replace(
+                demand, graph, cand_ht, alpha)
+        else:
+            is_end_ht, e_ht, cand_ht_m = self.hiertopo_model.single_move_wo_replace(
+                demand, graph, cand_ht, alpha)
+            e_rm = []
+
         is_end_rg, e_rg, cand_rg_m = self.rgreedy_model.single_move_wo_replace(
             demand, graph, cand_rg)
 
@@ -41,12 +56,20 @@ class SafeHierTopoAlg(object):
                 "[Step {0}] [RGreedy] end {1}, edge {2}, candidate {3}".format(
                     self.step, is_end_rg, e_rg, cand_rg_m))
 
-        is_end, e = self.fallback(
-            is_end_ht, e_ht, is_end_rg, e_rg)
+        is_end, e, e_rm = self.fallback(is_end_ht,
+                                        e_ht,
+                                        is_end_rg,
+                                        e_rg,
+                                        e_rm_ht=[])
 
         if not is_end:
             n = self.hiertopo_model.edge_to_node(e)
             graph.add_edge(n[0], n[1])
+
+            for e_r in e_rm:
+                n_r = self.hiertopo_model.edge_to_node(e_r)
+                graph.remove_edge(n_r[0], n_r[1])
+
             if verbose_level > 0:
                 print("[Step {0}] Action: ({1}, {2})".format(
                     self.step, n[0], n[1]))
@@ -66,26 +89,26 @@ class SafeHierTopoAlg(object):
 
         return is_end, graph, cand_ht_m, cand_rg_m
 
-    def fallback(self, is_end_ht, e_ht, is_end_rg, e_rg):
-        return self.fallback_period(is_end_ht, e_ht, is_end_rg, e_rg)
+    def fallback(self, is_end_ht, e_ht, is_end_rg, e_rg, e_rm_ht=[]):
+        return self.fallback_period(is_end_ht, e_ht, is_end_rg, e_rg, e_rm_ht)
 
-    def fallback_period(self, is_end_ht, e_ht, is_end_rg, e_rg):
+    def fallback_period(self, is_end_ht, e_ht, is_end_rg, e_rg, e_rm_ht=[]):
         if is_end_ht and is_end_rg:
-            return True, 0
+            return True, 0, []
         if is_end_ht:
-            return False, e_rg
+            return False, e_rg, []
         if is_end_rg:
-            return False, e_ht
+            return False, e_ht, e_rm_ht
 
         # both algorithm has normal output
         if self.cntr % self.period == 0:
             self.cntr += 1
             # use Hiertopo's decision
-            return False, e_ht
+            return False, e_ht, e_rm_ht
         else:
             self.cntr += 1
             # use routing-greedy decision:
-            return False, e_rg
+            return False, e_rg, []
 
     def run(self, params, verbose_level=0):
         demand = params["demand"]
@@ -107,7 +130,13 @@ class SafeHierTopoAlg(object):
         is_end = False
         while not is_end:
             is_end, G, cand_ht, cand_rg = self.single_move(
-                demand, G, cand_ht, cand_rg, alpha, is_w_replace=False, verbose_level=verbose_level)
+                demand,
+                G,
+                cand_ht,
+                cand_rg,
+                alpha,
+                is_w_replace=False,
+                verbose_level=verbose_level)
 
         return G
 
