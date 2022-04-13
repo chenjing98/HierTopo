@@ -482,7 +482,7 @@ class HierTopoPolynAlg(object):
 
     def single_move_wo_replace(self, demand, graph, cand, alpha):
         if len(cand) == 0:
-            return True, 0 , cand
+            return True, 0, cand
         adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
         cand_r = copy.deepcopy(cand)
         v = self.cal_v(demand, alpha, adj)
@@ -493,7 +493,8 @@ class HierTopoPolynAlg(object):
         n0 = n[0]
         n1 = n[1]
         while True:
-            if graph.degree(n0) < self.n_degree and graph.degree(n1) < self.n_degree:
+            if graph.degree(n0) < self.n_degree and graph.degree(
+                    n1) < self.n_degree:
                 return False, e, cand_r
             del cand_r[e_idx]
             if len(cand_r) == 0:
