@@ -140,6 +140,40 @@ class SafeHierTopoAlg(object):
 
         return G
 
+    def run_sequential(self, params, graph, verbose_level=0):
+        demand = params["demand"]
+        alpha = params["alpha"]
+        if "step" in params:
+            step_lim = params["step"]
+        else:
+            step_lim = 1e6
+
+        G = copy.deepcopy(graph)
+        # adj = np.array(nx.adjacency_matrix(G).todense(), np.float32)
+
+        cand_ht = []
+        cand_rg = []
+        for i in range(self.n_node - 1):
+            for j in range(i + 1, self.n_node):
+                cand_ht.append(i * self.n_node + j)
+                cand_rg.append(i * self.n_node + j)
+
+        is_end = False
+        while self.step < step_lim and not is_end:
+            is_end, G, cand_ht, cand_rg = self.single_move(
+                demand,
+                G,
+                cand_ht,
+                cand_rg,
+                alpha,
+                is_w_replace=True,
+                verbose_level=verbose_level)
+
+        return G
+
+    def reset(self):
+        self.step = 0
+
     def cal_pathlength(self, demand, graph):
         n_node = demand.shape[0]
         score = 0
@@ -176,6 +210,17 @@ class SafeHierTopoAlg(object):
                     route_port_change += 1
         return link_change, route_port_change
 
+
+def test_mp(solution,
+            test_size,
+            dataset,
+            n_node,
+            n_degree,
+            n_iter,
+            n_maxstep,
+            k,
+            period,
+            n_cpu_limit=cpu_count()):
     # Run the test parallelly
     params = []
     metrics = []
@@ -222,6 +267,45 @@ def test_standalone(solution, n_data, dataset, n_node, n_degree, n_iter,
     G = safe_model.run(param, verbose_level)
     h = safe_model.cal_pathlength(param["demand"], G)
     return h, 0
+
+
+def test_sequential(solution, dataset, n_node, n_degree, n_iter, n_maxstep, k,
+                    verbose_level):
+    hop_cnts = []
+    steps = []
+    routing_ports = []
+
+    param = {}
+    param["alpha"] = solution
+
+    G_prev = nx.Graph()
+    G_prev.add_nodes_from(list(range(n_node)))
+
+    if verbose_level > 1:
+        print("Dataset loaded. Ready to run.")
+
+    safe_model = SafeHierTopoAlg(n_node, n_degree, n_iter, n_maxstep, k)
+
+    for i in range(len(dataset)):
+        param["demand"] = dataset[i]
+        G = safe_model.run_sequential(param,
+                                      G_prev,
+                                      verbose_level=verbose_level)
+        safe_model.reset()
+        if i > 0:
+            h = safe_model.cal_pathlength(param["demand"], G)
+            s, p = safe_model.cal_change(G, G_prev)
+            if verbose_level > 0:
+                print("[Topo {0}] {1} {2} {3}".format(i, h, s, p))
+
+            hop_cnts.append(h)
+            steps.append(s)
+            routing_ports.append(p)
+
+        G_prev = nx.Graph(G)
+
+    return np.mean(hop_cnts), np.std(hop_cnts), np.mean(steps), np.std(
+        steps), np.mean(routing_ports), np.std(routing_ports)
 
 
 def main():
@@ -359,11 +443,12 @@ def main():
     if is_test:
         # n_testings = 1
         for test_data_number in range(n_testings):
-        # test_data_number = 106
-            pred, pred_std = test_standalone(solution, test_data_number, dataset,
-                                         n_node, n_degree, n_iter, n_maxstep,
-                                         k, is_verbose)
-            print("[Test {0}] avg {1} std {2}".format(test_data_number, pred, pred_std))
+            # test_data_number = 106
+            pred, pred_std = test_standalone(solution, test_data_number,
+                                             dataset, n_node, n_degree, n_iter,
+                                             n_maxstep, k, verbose_level)
+            print("[Test {0}] avg {1} std {2}".format(test_data_number, pred,
+                                                      pred_std))
     else:
         pred, pred_std = test_mp(solution, n_testings, dataset, n_node,
                                  n_degree, n_iter, n_maxstep, k, fb_period, n_cpu_limit=args.cpulimit)
