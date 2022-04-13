@@ -506,8 +506,52 @@ class HierTopoPolynAlg(object):
             n0 = n[0]
             n1 = n[1]
 
-    def single_move_w_replace(self):
-        pass
+    def single_move_w_replace(self, demand, graph, cand, alpha):
+        if len(cand) == 0:
+            return True, 0, [], cand
+        adj = np.array(nx.adjacency_matrix(graph).todense(), np.float32)
+        cand_r = copy.deepcopy(cand)
+        v = self.cal_v(demand, alpha, adj)
+        dif_e = self.cal_diff_in_range(v, cand_r)
+        e_idx = dif_e.index(max(dif_e))
+        e = cand_r[e_idx]
+        n = self.edge_to_node(e)
+        n0 = n[0]
+        n1 = n[1]
+
+        while True:
+            if graph.degree(n0) < self.n_degree and graph.degree(
+                    n1) < self.n_degree:
+                return False, e, [], cand_r
+            adj_rp = copy.deepcopy(adj)
+            edge_rm = []
+            if graph.degree(n0) >= self.n_degree:
+                e1_rm = self.find_nbr_rm_cand(graph, n0, v)
+                adj_rp[int(e1_rm / self.n_node), int(e1_rm % self.n_node)] = 0
+                adj_rp[int(e1_rm % self.n_node), int(e1_rm / self.n_node)] = 0
+                edge_rm.append(e1_rm)
+            if graph.degree(n1) >= self.n_degree:
+                e2_rm = self.find_nbr_rm_cand(graph, n1, v)
+                adj_rp[int(e2_rm / self.n_node), int(e2_rm % self.n_node)] = 0
+                adj_rp[int(e2_rm % self.n_node), int(e2_rm / self.n_node)] = 0
+                edge_rm.append(e2_rm)
+
+            adj_rp[n0, n1] = 1
+            adj_rp[n1, n0] = 1
+            v_rp = self.cal_v(demand, alpha, adj_rp)
+            if max(dif_e) + sum(self.cal_diff_in_range(v, edge_rm)) > sum(
+                    self.cal_diff_in_range(v_rp, [e])) + sum(
+                        self.cal_diff_in_range(v_rp, edge_rm)):
+                return False, e, edge_rm, cand_r
+            del cand_r[e_idx]
+            if len(cand_r) == 0:
+                return True, 0, [], cand_r
+            dif_e = self.cal_diff_in_range(v, cand_r)
+            e_idx = dif_e.index(max(dif_e))
+            e = cand_r[e_idx]
+            n = self.edge_to_node(e)
+            n0 = n[0]
+            n1 = n[1]
 
     def cal_pathlength(self, demand, graph):
         n_node = demand.shape[0]
@@ -533,6 +577,18 @@ class HierTopoPolynAlg(object):
         for i in range(self.k):
             exp_feature[:, :, i] = np.power(feature, i)
         return exp_feature
+
+    def find_nbr_rm_cand(self, graph, work_node, v):
+        nbr_node = [n for n in graph.neighbors(work_node)]
+        nbr_edge = np.where(
+            np.array(nbr_node) > work_node,
+            work_node * self.n_node + np.array(nbr_node),
+            np.array(nbr_node) * self.n_node + work_node).tolist()
+        dif_rm = self.cal_diff_in_range(v, nbr_edge)
+        e_idx_rm = dif_rm.index(min(dif_rm))
+        e_rm = nbr_edge[e_idx_rm]
+
+        return e_rm
 
     def cal_diff(self, v):
         N = v.shape[0]
