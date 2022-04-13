@@ -154,9 +154,28 @@ class SafeHierTopoAlg(object):
         score /= (sum(sum(demand)))
         return score
 
+    def cal_change(self, G, G_prev):
+        link_change = 0
+        route_port_change = 0
 
-def test_mp(solution, test_size, dataset, n_node, n_degree, n_iter, n_maxstep,
-            k, period, n_cpu_limit=cpu_count()):
+        adj = np.array(nx.adjacency_matrix(G).todense(), np.float32)
+        adj_prev = np.array(nx.adjacency_matrix(G_prev).todense(), np.float32)
+        for i in range(self.n_node - 1):
+            for j in range(i + 1, self.n_node):
+                if not adj[i][j] == adj_prev[i][j]:
+                    link_change += 1
+
+        paths = dict(nx.all_pairs_shortest_path(G))
+        paths_prev = dict(nx.all_pairs_shortest_path(G_prev))
+        for i in range(self.n_node):
+            for j in range(self.n_node):
+                if i == j:
+                    continue
+                # print(i, j, paths[i][j], paths_prev[i][j])
+                if not paths[i][j][1] == paths_prev[i][j][1]:
+                    route_port_change += 1
+        return link_change, route_port_change
+
     # Run the test parallelly
     params = []
     metrics = []
