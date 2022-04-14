@@ -47,6 +47,7 @@ class bMatching(object):
             # l = self.cal_pathlength(s, d)
             # path_lengths.append(l)
         # return np.mean(path_lengths)
+        return self.convert2adj()
 
     def FixSaturation(self, w, tau):
         Ew = [tau]
