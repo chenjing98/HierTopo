@@ -334,6 +334,7 @@ def main():
         "Level 0: no intermediate log, level 1: action log, level 2: more detailed state log",
         default=0)
     parser.add_argument("-t", "--test", action='store_true')
+    parser.add_argument("-seq", "--sequential", action='store_true')
     parser.add_argument(
         "-np",
         "--n_node_param",
@@ -444,18 +445,45 @@ def main():
         # n_testings = 1
         for test_data_number in range(n_testings):
             # test_data_number = 106
-            pred, pred_std = test_standalone(solution, test_data_number,
+            h_avg, h_std = test_standalone(solution, test_data_number,
                                              dataset, n_node, n_degree, n_iter,
                                              n_maxstep, k, verbose_level)
-            print("[Test {0}] avg {1} std {2}".format(test_data_number, pred,
-                                                      pred_std))
-    else:
-        pred, pred_std = test_mp(solution, n_testings, dataset, n_node,
-                                 n_degree, n_iter, n_maxstep, k, fb_period, n_cpu_limit=args.cpulimit)
+            print("[Test {0}] avg {1} std {2}".format(test_data_number, h_avg,
+                                                      h_std))
+    elif args.sequential:
+        h_avg, h_std, s_avg, s_std, p_avg, p_std = test_sequential(
+            solution,
+            dataset,
+            n_node,
+            n_degree,
+            n_iter,
+            n_maxstep,
+            k,
+            verbose_level=verbose_level)
+        # print("result: {0} {1} {2} {3} {4} {5}".format(h_avg, h_std, s_avg,
+                                                    #    s_std, p_avg, p_std))
+    else:    
+        h_avg, h_std = test_mp(solution,
+                                 n_testings,
+                                 dataset,
+                                 n_node,
+                                 n_degree,
+                                 n_iter,
+                                 n_maxstep,
+                                 k,
+                                 fb_period,
+                                 n_cpu_limit=args.cpulimit) 
+        
 
     t_end = timer()
-    print("[Average Hop] {}".format(pred))
-    print("[Standard Deviation Hop] {}".format(pred_std))
+    print("[Average Hop] {}".format(h_avg))
+    print("[Standard Deviation Hop] {}".format(h_std))
+    if args.sequential and not is_test:
+        print("[Average Step] {}".format(s_avg))
+        print("[Standard Deviation Step] {}".format(s_std))
+        print("[Average Change Port] {}".format(s_avg))
+        print("[Standard Deviation Change Port] {}".format(s_std))
+        
     print("[Average Test Time] {} s".format(
         (t_end - t_begin) / n_testings))  # in second
 
