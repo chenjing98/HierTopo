@@ -14,7 +14,7 @@ from param_search.plotv import TopoSimulator
 from baseline.bmatching import bMatching
 from multiprocessing import Pool
 
-methods = ["greedy", "dijgreedy"]
+methods = ["bmatch", "greedy", "egotree", "dijgreedy"]
 # methods = ["oblivious-opt"] # options: "optimal", "greedy", "egotree", "param-search", "rl", "bmatch", "optimal-mp", "oblivious"
 data_source = "scratch"  # options: "random8", "nsfnet", "geant2", "germany", "scratch"
 scheme = "complete"  # options: "complete", "bysteps"
@@ -84,6 +84,43 @@ def cal_pathlength(state, num_node, demand, degree):
 
     cost /= (sum(sum(demand)))
     return cost
+
+def check_connectivity(paths, i, j):
+    if not i in paths:
+        return False
+    if not j in paths[i]:
+        return False
+    return True
+
+def cal_change(adj, adj_prev, n_node):
+    link_change = 0
+    route_port_change = 0
+
+    for i in range(n_node - 1):
+        for j in range(i + 1, n_node):
+            if not adj[i][j] == adj_prev[i][j]:
+                link_change += 1
+
+    G = nx.from_numpy_matrix(adj)
+    G_prev = nx.from_numpy_matrix(adj_prev)
+    paths = dict(nx.all_pairs_shortest_path(G))
+    paths_prev = dict(nx.all_pairs_shortest_path(G_prev))
+    for i in range(n_node):
+        for j in range(n_node):
+            if i == j:
+                continue
+            # print(i, j, paths[i][j], paths_prev[i][j])
+            is_connected = check_connectivity(paths, i, j)
+            is_connected_prev = check_connectivity(paths_prev, i, j)
+            if (is_connected and not is_connected_prev) or (is_connected_prev and not is_connected):
+                route_port_change += 1
+                continue
+            if not is_connected and not is_connected_prev:
+                continue
+            if not paths[i][j][1] == paths_prev[i][j][1]:
+                route_port_change += 1
+    return link_change, route_port_change
+
 
 def main():
     hops = {}
@@ -179,6 +216,10 @@ def main():
                 state_e, _ = test_e.estab()
                 # print("adj: {}".format(state_e))
                 hop_e = cal_pathlength(state_e, n_node, demand, degree)
+                if i_iter > 0:
+                    step, port = cal_change(state_e, adjs["egotree"], n_node)
+                    steps["egotree"].append(step)
+                    ports["egotree"].append(port)
                 adjs["egotree"] = state_e
                 hops["egotree"].append(hop_e)
                 print("egotree: {}".format(hop_e))
@@ -187,6 +228,10 @@ def main():
                 state_b = bmatch.match(demand)
                 cost_b = cal_pathlength(state_b, n_node, demand, degree)
                 hops["bmatch"].append(cost_b)
+                if i_iter > 0:
+                    step, port = cal_change(state_b, adjs["bmatch"], n_node)
+                    steps["bmatch"].append(step)
+                    ports["bmatch"].append(port)
                 adjs["bmatch"] = state_b
                 print("bmatching: {}".format(cost_b))
 
@@ -199,6 +244,10 @@ def main():
                         nx.adjacency_matrix(opt_graph).todense(), np.float32)
                     cost_o = cal_pathlength(state_o, n_node, demand, degree)
                     hops["optimal"].append(cost_o)
+                    if i_iter > 0:
+                        step, port = cal_change(state_o, adjs["optimal"], n_node)
+                        steps["optimal"].append(step)
+                        ports["optimal"].append(port)
                     adjs["optimal"] = state_o
                     print("optimal: {}".format(cost_o))
                     #v_optimal = opt.consturct_v(best_action,neigh)
@@ -206,6 +255,10 @@ def main():
                     cost, _ = opt.optimal_topology(n_node, demand, degree)
                     cost_o = cost / (sum(sum(demand)))
                     hops["optimal"].append(cost_o)
+                    if i_iter > 0:
+                        step, port = cal_change(state_o, adjs["optimal"], n_node)
+                        steps["optimal"].append(step)
+                        ports["optimal"].append(port)
                     adjs["optimal"] = state_o
                     print("optimal: {}".format(cost_o))
 
@@ -221,6 +274,10 @@ def main():
                     state_m = permatch_model.matching(demand, degree)
                 cost_m = cal_pathlength(state_m, n_node, demand, degree)
                 hops["greedy"].append(cost_m)
+                if i_iter > 0:
+                    step, port = cal_change(state_m, adjs["greedy"], n_node)
+                    steps["greedy"].append(step)
+                    ports["greedy"].append(port)
                 adjs["greedy"] = state_m
                 print("greedy: {}".format(cost_m))
 
@@ -236,6 +293,10 @@ def main():
                     state_d = dijgreedy_model.topo_scratch(demand, degree)
                 cost_d = cal_pathlength(state_d, n_node, demand, degree)
                 hops["dijgreedy"].append(cost_d)
+                if i_iter > 0:
+                    step, port = cal_change(state_d, adjs["dijgreedy"], n_node)
+                    steps["dijgreedy"].append(step)
+                    ports["dijgreedy"].append(port)
                 adjs["dijgreedy"] = state_d
                 print("dijkstra greedy: {}".format(cost_d))
 
@@ -279,6 +340,10 @@ def main():
                             state_ob[i, j] = 1
                 cost_ob = cal_pathlength(state_ob, n_node, demand, degree)
                 hops["oblivious"].append(cost_ob)
+                if i_iter > 0:
+                    step, port = cal_change(state_ob, adjs["oblivious"], n_node)
+                    steps["oblivious"].append(step)
+                    ports["oblivious"].append(port)
                 adjs["oblivious"] = state_ob
                 print("oblivious: {}".format(cost_ob))
 
