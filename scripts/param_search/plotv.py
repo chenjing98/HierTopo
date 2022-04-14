@@ -5,7 +5,7 @@ import numpy as np
 import pickle as pk
 import networkx as nx
 
-def compute_reward(state, num_node, demand, degree):    
+def cal_pathlength(state, num_node, demand, degree):    
     D = copy.deepcopy(state)
  
     graph = nx.from_numpy_matrix(D)
@@ -105,7 +105,7 @@ class TopoSimulator(object):
                 self._add_edge(rm_ind)
         
         new_adj = np.array(nx.adjacency_matrix(self.graph).todense(), np.float32)
-        cost = compute_reward(new_adj,self.max_node,self.demand,self.allowed_degree)
+        cost = cal_pathlength(new_adj,self.max_node,self.demand,self.allowed_degree)
         return cost
 
     def step_graph(self, n_node, action, demand=None, topology=None, allowed_degree=None):

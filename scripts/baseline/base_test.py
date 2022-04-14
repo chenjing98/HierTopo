@@ -5,7 +5,7 @@ from ego_tree import *
 from permatch import permatch
 from params import args
 
-def compute_reward(state, node_num, demand, degree, degree_penalty):    
+def cal_pathlength(state, node_num, demand, degree, degree_penalty):    
     D = state.copy()       
 
     # floyd shortest path algorithm
@@ -55,5 +55,5 @@ if __name__ == "__main__":
             test = permatch(node_num)
             state = test.matching(demand, degree)
                 
-        score = compute_reward(state, node_num, demand, degree, 50)
+        score = cal_pathlength(state, node_num, demand, degree, 50)
         print(score)

@@ -13,11 +13,10 @@ from baseline.dijkstra_greedy import DijGreedyAlg
 from param_search.OptSearch import TopoOperator, dict2dict, dict2nxdict
 from param_search.plotv import TopoSimulator
 
-
 methods = ["greedy", "dijgreedy"]
 # methods = ["oblivious-opt"] # options: "optimal", "greedy", "egotree", "param-search", "rl", "bmatch", "optimal-mp", "oblivious"
-data_source = "scratch" # options: "random8", "nsfnet", "geant2", "germany", "scratch"
-scheme = "complete" # options: "complete", "bysteps"
+data_source = "scratch"  # options: "random8", "nsfnet", "geant2", "germany", "scratch"
+scheme = "complete"  # options: "complete", "bysteps"
 Max_degree = 4
 n_steps = 1
 n_nodes = 50
@@ -54,22 +53,25 @@ elif data_source == "germany":
 elif data_source == "scratch":
     node_num = n_nodes
     n_iters = 1000
-    file_demand = '../data/2000_{0}_{1}_logistic.pk3'.format(n_nodes, Max_degree)
+    file_demand = '../data/2000_{0}_{1}_logistic.pk3'.format(
+        n_nodes, Max_degree)
 else:
     print("data_source {} unrecognized.".format(data_source))
     exit(1)
 
-def compute_reward(state, num_node, demand, degree):    
+
+def cal_pathlength(state, n_node, demand, degree):
     D = copy.deepcopy(state)
     graph = nx.from_numpy_matrix(D)
     cost = 0
-    for s, d in itertools.product(range(num_node), range(num_node)):
+    for s, d in itertools.product(range(n_node), range(n_node)):
         try:
-            path_length = float(nx.shortest_path_length(graph,source=s,target=d))
+            path_length = float(
+                nx.shortest_path_length(graph, source=s, target=d))
         except nx.exception.NetworkXNoPath:
-            path_length = float(num_node)
+            path_length = float(n_node)
 
-        cost += path_length * demand[s,d]   
+        cost += path_length * demand[s, d]
 
     cost /= (sum(sum(demand)))
     return cost
@@ -88,13 +90,11 @@ def main():
     if data_source == "scratch":
         with open(file_demand, 'rb') as f:
             dataset = pk.load(f)
-    else: 
+    else:
         with open(file_demand_degree, 'rb') as f1:
             dataset = pk.load(f1)
         with open(file_topo, 'rb') as f2:
             dataset_topo = pk.load(f2)
-
-
 
     # start testing
     for i_iter in range(n_iters):
@@ -104,62 +104,65 @@ def main():
             topo = dataset_topo[i_iter]
         elif data_source == "scratch":
             demand = dataset[i_iter]
-            degree = Max_degree * np.ones((node_num,), dtype=np.float32)
+            degree = Max_degree * np.ones((node_num, ), dtype=np.float32)
         else:
             demand = dataset[i_iter]
-            degree = Max_degree * np.ones((node_num,), dtype=np.float32)
+            degree = Max_degree * np.ones((node_num, ), dtype=np.float32)
             topo = dataset_topo
 
-        print("[iter {}]".format(i_iter))
+        # print("[iter {}]".format(i_iter))
 
-                
         if "dijgreedy" in methods:
             if scheme == "bysteps":
                 origin_graph = nx.from_dict_of_dicts(topo)
-                result_graph = dijgreedy_model.topo_nsteps(demand, origin_graph, degree, n_steps)
-                state_d = np.array(nx.adjacency_matrix(result_graph).todense(), np.float32)
+                result_graph = dijgreedy_model.topo_nsteps(
+                    demand, origin_graph, degree, n_steps)
+                state_d = np.array(
+                    nx.adjacency_matrix(result_graph).todense(), np.float32)
             if scheme == "complete":
                 state_d = dijgreedy_model.topo_scratch(demand, degree)
-            cost_d = compute_reward(state_d, node_num, demand, degree)
+            cost_d = cal_pathlength(state_d, node_num, demand, degree)
             costs_dij.append(cost_d)
-            print("dijkstra greedy: {}".format(cost_d))
-            
+            # print("dijkstra greedy: {}".format(cost_d))
 
     t_end = timer()
 
-    print("Setting:\ndata source = {0}\nn_nodes     = {1}".format(data_source, node_num))
+    print("Setting:\ndata source = {0}\nn_nodes     = {1}".format(
+        data_source, node_num))
     if scheme == "bysteps":
         print("======== Avg_costs & std ({} step(s)) ========".format(n_steps))
     elif scheme == "complete":
         print("========== Avg_costs & std (compl) ===========")
-    
-    if "dijgreedy" in methods:
-        print("dijkstra greedy  : {0}  std : {1}".format(np.mean(costs_dij),np.std(costs_dij)))
-    print("testing time : {} s".format(t_end-t_begin))
-    
-    
 
-def obs2adj(obs,node_num):
+    if "dijgreedy" in methods:
+        print("dijkstra greedy  : {0}  std : {1}".format(
+            np.mean(costs_dij), np.std(costs_dij)))
+    print("testing time : {} s".format(t_end - t_begin))
+
+
+def obs2adj(obs, node_num):
     """
     :param obs: N x (N+1) matrix for adjacent matrix with edge features and a vector with node features
     :return: adjacent matrix
     """
-    obs = np.reshape(obs,((2*node_num+1),node_num))
-    adj = obs[node_num:-1,:]
+    obs = np.reshape(obs, ((2 * node_num + 1), node_num))
+    adj = obs[node_num:-1, :]
     #adj[adj>0] = 1
     return adj
 
-def obs_process(obs,node_num):
+
+def obs_process(obs, node_num):
     """
     :param obs: N x (N+1) matrix for adjacent matrix with edge features and a vector with node features
     :return: adjacent matrix
     """
-    obs = np.reshape(obs,((2*node_num+1),node_num))
-    demand = obs[:node_num,:]
-    adj = obs[node_num:-1,:]
+    obs = np.reshape(obs, ((2 * node_num + 1), node_num))
+    demand = obs[:node_num, :]
+    adj = obs[node_num:-1, :]
     deg = obs[-1, :]
     #adj[adj>0] = 1
-    return demand[np.newaxis,:], adj[np.newaxis,:], deg[np.newaxis,:]
+    return demand[np.newaxis, :], adj[np.newaxis, :], deg[np.newaxis, :]
+
 
 if __name__ == "__main__":
     main()
