@@ -56,8 +56,8 @@ class DijGreedyAlg(object):
 
         return state
 
-    def topo_nsteps(self, demand, graph, degree, n_steps):
-        allowed_degree = copy.deepcopy(degree)
+    def topo_nsteps(self, demand, graph, n_steps):
+        # allowed_degree = copy.deepcopy(degree)
         demand_vec = []
         for i in range(self.n_node - 1):
             for j in range(i + 1, self.n_node):
@@ -70,22 +70,25 @@ class DijGreedyAlg(object):
 
         step = 0
         while step < n_steps:
-            if max(crit_vec) < 0:
+            if max(crit_vec) <= 0:
                 break
             # choose edge
             e = crit_vec.index(max(crit_vec))
             n = self.edge_to_node(e)
-            n1 = n[0]
-            n2 = n[1]
+            n0 = n[0]
+            n1 = n[1]
 
             #make this edge not be used again
             demand_vec[e] = -self.inf
+            crit_vec[e] = -self.inf
 
-            if allowed_degree[n1] > 0 and allowed_degree[n2] > 0:
+            if new_graph.has_edge(n0, n1) > 0:
+                continue
+            if new_graph.degree(n0) < self.n_degree and new_graph.degree(n1) < self.n_degree:
                 step += 1
-                allowed_degree[n1] -= 1
-                allowed_degree[n2] -= 1
-                new_graph.add_edge(n1, n2)
+                # allowed_degree[n0] -= 1
+                # allowed_degree[n1] -= 1
+                new_graph.add_edge(n0, n1)
 
                 plen_vec = self.update_plen(new_graph)
                 crit_vec = []
