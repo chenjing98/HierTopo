@@ -4,6 +4,7 @@ import numpy as np
 import networkx as nx
 import pickle as pk
 from timeit import default_timer as timer
+import argparse
 
 from baseline.ego_tree import ego_tree_unit
 from baseline.permatch import permatch
@@ -14,10 +15,10 @@ from param_search.plotv import TopoSimulator
 from baseline.bmatching import bMatching
 from multiprocessing import Pool
 
-methods = ["bmatch", "greedy", "egotree", "dijgreedy"]
+# methods = ["bmatch", "greedy", "egotree", "dijgreedy"]
 # methods = ["oblivious-opt"] # options: "optimal", "greedy", "egotree", "param-search", "rl", "bmatch", "optimal-mp", "oblivious"
 data_source = "scratch"  # options: "random8", "nsfnet", "geant2", "germany", "scratch"
-scheme = "complete"  # options: "complete", "bysteps"
+# scheme = "complete"  # options: "complete", "bysteps"
 Max_degree = 4
 n_steps = 1
 n_node = 50
@@ -85,12 +86,14 @@ def cal_pathlength(state, num_node, demand, degree):
     cost /= (sum(sum(demand)))
     return cost
 
+
 def check_connectivity(paths, i, j):
     if not i in paths:
         return False
     if not j in paths[i]:
         return False
     return True
+
 
 def cal_change(adj, adj_prev, n_node):
     link_change = 0
@@ -112,7 +115,9 @@ def cal_change(adj, adj_prev, n_node):
             # print(i, j, paths[i][j], paths_prev[i][j])
             is_connected = check_connectivity(paths, i, j)
             is_connected_prev = check_connectivity(paths_prev, i, j)
-            if (is_connected and not is_connected_prev) or (is_connected_prev and not is_connected):
+            if (is_connected
+                    and not is_connected_prev) or (is_connected_prev
+                                                   and not is_connected):
                 route_port_change += 1
                 continue
             if not is_connected and not is_connected_prev:
@@ -123,6 +128,71 @@ def cal_change(adj, adj_prev, n_node):
 
 
 def main():
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-n",
+                        "--n_node",
+                        type=int,
+                        help="Number of nodes in the network",
+                        default=30)
+    parser.add_argument("-s",
+                        "--scheme",
+                        type=str,
+                        help="The topology adjustment scheme",
+                        default="bysteps",
+                        choices=["complete", "bysteps"])
+    parser.add_argument("-m",
+                        "--method",
+                        type=str,
+                        help="The method to be used",
+                        default="greedy",
+                        choices=[
+                            "optimal", "greedy", "egotree", "param-search",
+                            "rl", "bmatch", "optimal-mp", "oblivious", "dijgreedy"
+                        ])
+    args = parser.parse_args()
+    
+    scheme = args.scheme
+    methods = []
+    methods.append(args.method)
+    
+    if "rl" in methods:
+        from stable_baselines import PPO2
+    if "sl" in methods:
+        import tensorflow as tf
+        from SL.SLmodel import supervisedModel
+    if "rl" in methods or "sl" in methods:
+        from RL.topoenv_backup import TopoEnv
+
+    if data_source == "random8":
+        n_node = 8
+        n_iters = 1000
+        file_demand_degree = '../data/10000_8_4_test.pk3'
+        file_topo = "../data/10000_8_4_topo_test.pk3"
+    elif data_source == "nsfnet":
+        n_node = 14
+        n_iters = 100
+        file_demand_degree = '../data/nsfnet/demand_100.pkl'
+        file_topo = '../data/nsfnet/topology.pkl'
+    elif data_source == "geant2":
+        n_node = 24
+        n_iters = 100
+        file_demand_degree = '../data/geant2/demand_100.pkl'
+        file_topo = '../data/geant2/topology.pkl'
+    elif data_source == "germany":
+        n_node = 50
+        n_iters = 100
+        file_demand_degree = '../data/germany/demand_100.pkl'
+        file_topo = '../data/germany/topology.pkl'
+    elif data_source == "scratch":
+        n_node = args.n_node
+        n_iters = 1000
+        file_demand = '../data/2000_{0}_{1}_logistic.pk3'.format(
+            n_node, Max_degree)
+    else:
+        print("data_source {} unrecognized.".format(data_source))
+        exit(1)
+
     hops = {}
     steps = {}
     ports = {}
@@ -245,7 +315,8 @@ def main():
                     cost_o = cal_pathlength(state_o, n_node, demand, degree)
                     hops["optimal"].append(cost_o)
                     if i_iter > 0:
-                        step, port = cal_change(state_o, adjs["optimal"], n_node)
+                        step, port = cal_change(state_o, adjs["optimal"],
+                                                n_node)
                         steps["optimal"].append(step)
                         ports["optimal"].append(port)
                     adjs["optimal"] = state_o
@@ -256,7 +327,8 @@ def main():
                     cost_o = cost / (sum(sum(demand)))
                     hops["optimal"].append(cost_o)
                     if i_iter > 0:
-                        step, port = cal_change(state_o, adjs["optimal"], n_node)
+                        step, port = cal_change(state_o, adjs["optimal"],
+                                                n_node)
                         steps["optimal"].append(step)
                         ports["optimal"].append(port)
                     adjs["optimal"] = state_o
@@ -333,54 +405,53 @@ def main():
                 state_ob = np.zeros((n_node, n_node))
                 for i in range(n_node):
                     for j in range(n_node):
-                        if (j - i
-                            ) % n_node == 1 or (j - i) % n_node == 2 or (
-                                i - j) % n_node == 1 or (i -
-                                                          j) % n_node == 2:
+                        if (j - i) % n_node == 1 or (j - i) % n_node == 2 or (
+                                i - j) % n_node == 1 or (i - j) % n_node == 2:
                             state_ob[i, j] = 1
                 cost_ob = cal_pathlength(state_ob, n_node, demand, degree)
                 hops["oblivious"].append(cost_ob)
                 if i_iter > 0:
-                    step, port = cal_change(state_ob, adjs["oblivious"], n_node)
+                    step, port = cal_change(state_ob, adjs["oblivious"],
+                                            n_node)
                     steps["oblivious"].append(step)
                     ports["oblivious"].append(port)
                 adjs["oblivious"] = state_ob
                 print("oblivious: {}".format(cost_ob))
 
-        ## test supervised learning
-        #obs = env.reset(demand=demand,degree=degree,provide=True)
-        #demand_input, adj_input, deg_input = obs_process(obs, node_num)
-        #potential = model.predict(demand_input,adj_input, deg_input)
-        #action = np.squeeze(potential)
-        #obs, _, _, _ = env.step(action)
-        #state_sl = obs2adj(obs,node_num)
-        #cost_sl = cal_pathlength(state_sl, node_num, demand, degree)
-        #costs_sl.append(cost_sl)
-        #print("SL: {}".format(cost_sl))
+            ## test supervised learning
+            #obs = env.reset(demand=demand,degree=degree,provide=True)
+            #demand_input, adj_input, deg_input = obs_process(obs, node_num)
+            #potential = model.predict(demand_input,adj_input, deg_input)
+            #action = np.squeeze(potential)
+            #obs, _, _, _ = env.step(action)
+            #state_sl = obs2adj(obs,node_num)
+            #cost_sl = cal_pathlength(state_sl, node_num, demand, degree)
+            #costs_sl.append(cost_sl)
+            #print("SL: {}".format(cost_sl))
 
-        ## optimal (1 step)
-        #origin_graph = nx.from_dict_of_dicts(topo)
-        #best_action,neigh,opt_graph = opt.compute_optimal(node_num,origin_graph,demand,degree)
-        #state_o1 = np.array(nx.adjacency_matrix(opt_graph).todense(), np.float32)
-        #cost_o1 = cal_pathlength(state_o1, node_num, demand, degree, 100)
-        #opt_dict = opt.multistep_compute_optimal(node_num,topo,demand,degree,n_steps)
+            ## optimal (1 step)
+            #origin_graph = nx.from_dict_of_dicts(topo)
+            #best_action,neigh,opt_graph = opt.compute_optimal(node_num,origin_graph,demand,degree)
+            #state_o1 = np.array(nx.adjacency_matrix(opt_graph).todense(), np.float32)
+            #cost_o1 = cal_pathlength(state_o1, node_num, demand, degree, 100)
+            #opt_dict = opt.multistep_compute_optimal(node_num,topo,demand,degree,n_steps)
 
-        ## parameter search (1 step)
-        #v_weightedsum = opr.predict(topo,demand)
-        #cost_s = sim.step(8,v_weightedsum,0,demand,topo,degree)
+            ## parameter search (1 step)
+            #v_weightedsum = opr.predict(topo,demand)
+            #cost_s = sim.step(8,v_weightedsum,0,demand,topo,degree)
 
-        ## test h w/o NN
-        #obs = env.reset(demand=demand,degree=degree,provide=True)
-        #done = False
-        #steps = 0
-        #while not done:
-        #    graph, demand = obs
-        #    action = opr.h_predict(graph,demand)
-        #    obs, done = env.step(action)
-        #    steps += 1
-        #graph, _ = obs
-        #state_h = np.array(nx.adjacency_matrix(graph).todense(),dtype=np.float32)
-        #cost_h = cal_pathlength(state_h, node_num, demand, degree)
+            ## test h w/o NN
+            #obs = env.reset(demand=demand,degree=degree,provide=True)
+            #done = False
+            #steps = 0
+            #while not done:
+            #    graph, demand = obs
+            #    action = opr.h_predict(graph,demand)
+            #    obs, done = env.step(action)
+            #    steps += 1
+            #graph, _ = obs
+            #state_h = np.array(nx.adjacency_matrix(graph).todense(),dtype=np.float32)
+            #cost_h = cal_pathlength(state_h, node_num, demand, degree)
 
     t_end = timer()
 
@@ -392,7 +463,13 @@ def main():
         print("========== Avg_costs & std (compl) ===========")
 
     for m in methods:
-        print("[Alg] {0} [Average Hop] {1} [Standard Deviation Hop] {2} [Average Step] {3} [Standard Deviation Step] {4} [Average Change Port] {5} [Standard Deviation Change Port] {6}".format(m, np.mean(hops[m]), np.std(hops[m]), ))
+        print("[Alg] {}".format(m))
+        print("[Average Hop] {}".format(np.mean(hops[m])))
+        print("[Standard Deviation Hop] {}".format(np.std(hops[m])))
+        print("[Average Step] {}".format(np.mean(steps[m])))
+        print("[Standard Deviation Step] {}".format(np.std(steps[m])))
+        print("[Average Change Port] {}".format(np.mean(ports[m])))
+        print("[Standard Deviation Change Port] {}".format(np.std(ports[m])))
     print("[Average Test Time] {} s".format(t_end - t_begin))
 
 
