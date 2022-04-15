@@ -9,10 +9,6 @@ import pickle as pk
 
 from .plotv import TopoSimulator
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--start", type=int, default=0, help="the starting number for file naming")
-args = parser.parse_args()
-
 class TopoOperator(object):
     def __init__(self, n_node, max_iterstep=50, infinity=1e6, eps=1e-4):
         self.max_node = n_node
@@ -243,6 +239,10 @@ def dict2nxdict(n_node, dic):
     return graph_dict
 
 def main():
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--start", type=int, default=0, help="the starting number for file naming")
+    args = parser.parse_args()
     # Set parameters
     start_no = args.start
     n_node = 24
