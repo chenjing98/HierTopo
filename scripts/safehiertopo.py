@@ -481,8 +481,8 @@ def main():
     if args.sequential and not is_test:
         print("[Average Step] {}".format(s_avg))
         print("[Standard Deviation Step] {}".format(s_std))
-        print("[Average Change Port] {}".format(s_avg))
-        print("[Standard Deviation Change Port] {}".format(s_std))
+        print("[Average Change Port] {}".format(p_avg))
+        print("[Standard Deviation Change Port] {}".format(p_std))
         
     print("[Average Test Time] {} s".format(
         (t_end - t_begin) / n_testings))  # in second
