@@ -131,7 +131,7 @@ class DijGreedyAlg(object):
                     del cand_r[e_idx]
 
     def single_move_w_replace(self, demand, graph, degree, cand):
-        """
+        """ (Not debugged)
         @param cand: list of position candidates.
         @return: is_end: bool, whether the topology adjustment ends
         @return: e
