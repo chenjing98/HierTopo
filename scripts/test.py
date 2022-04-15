@@ -20,7 +20,7 @@ from multiprocessing import Pool
 data_source = "scratch"  # options: "random8", "nsfnet", "geant2", "germany", "scratch"
 # scheme = "complete"  # options: "complete", "bysteps"
 Max_degree = 4
-n_steps = 1
+n_steps = 20
 n_node = 50
 
 # parameters for "search"
@@ -31,43 +31,6 @@ alpha_i = 0.1
 dims = [3, 64, 1]
 model_name_sl = "../saved_model/model"
 model_name_rl = "../saved_model/gnn_ppo4topo1"
-
-if "rl" in methods:
-    from stable_baselines import PPO2
-if "sl" in methods:
-    import tensorflow as tf
-    from SL.SLmodel import supervisedModel
-if "rl" in methods or "sl" in methods:
-    from RL.topoenv_backup import TopoEnv
-
-if data_source == "random8":
-    n_node = 8
-    n_iters = 1000
-    file_demand_degree = '../data/10000_8_4_test.pk3'
-    file_topo = "../data/10000_8_4_topo_test.pk3"
-elif data_source == "nsfnet":
-    n_node = 14
-    n_iters = 100
-    file_demand_degree = '../data/nsfnet/demand_100.pkl'
-    file_topo = '../data/nsfnet/topology.pkl'
-elif data_source == "geant2":
-    n_node = 24
-    n_iters = 100
-    file_demand_degree = '../data/geant2/demand_100.pkl'
-    file_topo = '../data/geant2/topology.pkl'
-elif data_source == "germany":
-    n_node = 50
-    n_iters = 100
-    file_demand_degree = '../data/germany/demand_100.pkl'
-    file_topo = '../data/germany/topology.pkl'
-elif data_source == "scratch":
-    n_node = n_node
-    n_iters = 1000
-    file_demand = '../data/2000_{0}_{1}_logistic.pk3'.format(
-        n_node, Max_degree)
-else:
-    print("data_source {} unrecognized.".format(data_source))
-    exit(1)
 
 
 def cal_pathlength(state, num_node, demand, degree):
@@ -279,8 +242,7 @@ def main():
 
             if "egotree" in methods:
                 int_degree = degree.astype(int)
-                test_e = ego_tree_unit(demand, n_node, int_degree,
-                                       Max_degree)
+                test_e = ego_tree_unit(demand, n_node, int_degree, Max_degree)
                 test_e.create_tree()
                 test_e.change_insert()
                 state_e, _ = test_e.estab()
@@ -336,12 +298,16 @@ def main():
 
             if "greedy" in methods:
                 if scheme == "bysteps":
-                    origin_graph = nx.from_dict_of_dicts(topo)
+                    # origin_graph = nx.from_dict_of_dicts(topo)
+                    if i_iter == 0:
+                        origin_graph = nx.Graph()
+                        origin_graph.add_nodes_from(list(range(n_node)))
                     permatch_new_graph = permatch_model.n_steps_matching(
                         demand, origin_graph, degree, n_steps)
                     state_m = np.array(
                         nx.adjacency_matrix(permatch_new_graph).todense(),
                         np.float32)
+                    origin_graph = nx.from_numpy_matrix(state_m)
                 if scheme == "complete":
                     state_m = permatch_model.matching(demand, degree)
                 cost_m = cal_pathlength(state_m, n_node, demand, degree)
@@ -355,12 +321,16 @@ def main():
 
             if "dijgreedy" in methods:
                 if scheme == "bysteps":
-                    origin_graph = nx.from_dict_of_dicts(topo)
+                    # origin_graph = nx.from_dict_of_dicts(topo)
+                    if i_iter == 0:
+                        origin_graph = nx.Graph()
+                        origin_graph.add_nodes_from(list(range(n_node)))
                     result_graph = dijgreedy_model.topo_nsteps(
-                        demand, origin_graph, degree, n_steps)
+                        demand, origin_graph, n_steps)
                     state_d = np.array(
                         nx.adjacency_matrix(result_graph).todense(),
                         np.float32)
+                    origin_graph = result_graph
                 if scheme == "complete":
                     state_d = dijgreedy_model.topo_scratch(demand, degree)
                 cost_d = cal_pathlength(state_d, n_node, demand, degree)
