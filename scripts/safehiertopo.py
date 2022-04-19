@@ -253,7 +253,7 @@ def test_mp(solution,
 
 
 def test_standalone(solution, n_data, dataset, n_node, n_degree, n_iter,
-                    n_maxstep, k, verbose_level):
+                    n_maxstep, k, period, verbose_level):
     param = {}
     if n_data < len(dataset):
         param["demand"] = dataset[n_data]
@@ -264,13 +264,14 @@ def test_standalone(solution, n_data, dataset, n_node, n_degree, n_iter,
     if verbose_level > 1:
         print("Dataset loaded. Ready to run.")
     safe_model = SafeHierTopoAlg(n_node, n_degree, n_iter, n_maxstep, k)
+    safe_model.set_period(period)
     G = safe_model.run(param, verbose_level)
     h = safe_model.cal_pathlength(param["demand"], G)
     return h, 0
 
 
 def test_sequential(solution, dataset, n_node, n_degree, n_iter, n_maxstep, k,
-                    verbose_level):
+                    period, verbose_level):
     hop_cnts = []
     steps = []
     routing_ports = []
@@ -285,6 +286,7 @@ def test_sequential(solution, dataset, n_node, n_degree, n_iter, n_maxstep, k,
         print("Dataset loaded. Ready to run.")
 
     safe_model = SafeHierTopoAlg(n_node, n_degree, n_iter, n_maxstep, k)
+    safe_model.set_period(period)
 
     for i in range(len(dataset)):
         param["demand"] = dataset[i]
@@ -445,9 +447,9 @@ def main():
         # n_testings = 1
         for test_data_number in range(n_testings):
             # test_data_number = 106
-            h_avg, h_std = test_standalone(solution, test_data_number,
-                                             dataset, n_node, n_degree, n_iter,
-                                             n_maxstep, k, verbose_level)
+            h_avg, h_std = test_standalone(solution, test_data_number, dataset,
+                                           n_node, n_degree, n_iter, n_maxstep,
+                                           k, fb_period, verbose_level)
             print("[Test {0}] avg {1} std {2}".format(test_data_number, h_avg,
                                                       h_std))
     elif args.sequential:
@@ -459,21 +461,21 @@ def main():
             n_iter,
             n_maxstep,
             k,
+            fb_period,
             verbose_level=verbose_level)
         # print("result: {0} {1} {2} {3} {4} {5}".format(h_avg, h_std, s_avg,
-                                                    #    s_std, p_avg, p_std))
-    else:    
+        #    s_std, p_avg, p_std))
+    else:
         h_avg, h_std = test_mp(solution,
-                                 n_testings,
-                                 dataset,
-                                 n_node,
-                                 n_degree,
-                                 n_iter,
-                                 n_maxstep,
-                                 k,
-                                 fb_period,
-                                 n_cpu_limit=args.cpulimit) 
-        
+                               n_testings,
+                               dataset,
+                               n_node,
+                               n_degree,
+                               n_iter,
+                               n_maxstep,
+                               k,
+                               fb_period,
+                               n_cpu_limit=args.cpulimit)
 
     t_end = timer()
     print("[Average Hop] {}".format(h_avg))
@@ -483,7 +485,7 @@ def main():
         print("[Standard Deviation Step] {}".format(s_std))
         print("[Average Change Port] {}".format(p_avg))
         print("[Standard Deviation Change Port] {}".format(p_std))
-        
+
     print("[Average Test Time] {} s".format(
         (t_end - t_begin) / n_testings))  # in second
 
