@@ -478,6 +478,11 @@ def main():
                         help="The topology adjustment scheme",
                         default="replace",
                         choices=["replace", "add"])
+    parser.add_argument("-td",
+                        "--demand",
+                        type=str,
+                        default="logistic",
+                        choices=["logistic", "DCTCP", "FB"])
     parser.add_argument("-f", "--fast", action='store_true')
     args = parser.parse_args()
 
@@ -518,8 +523,12 @@ def main():
         n_node = n_node
         n_testings = 1000
         #n_iter = int(n_nodes*(n_nodes-1)/2)
-        file_demand = '../data/2000_{0}_{1}_logistic.pk3'.format(
-            n_node, n_degree)
+        if args.demand == "logistic":
+            file_demand = '../data/2000_{0}_{1}_{2}.pk3'.format(
+            n_node, n_degree, args.demand)
+        else:
+            file_demand = "../../hiertopo-bl/dataDC/testdata/1000_{0}_{1}_{2}.pk3".format(
+                n_node, n_degree, args.demand)
     else:
         print("data_source {} unrecognized.".format(data_source))
         exit(1)
