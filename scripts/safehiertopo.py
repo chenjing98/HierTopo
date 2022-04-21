@@ -26,6 +26,7 @@ class SafeHierTopoAlg(object):
         self.cntr = 0
         self.period = 5
         self.step = 0
+        self.end_pending = False
 
     def set_period(self, period):
         self.period = period
@@ -89,6 +90,72 @@ class SafeHierTopoAlg(object):
 
         return is_end, graph, cand_ht_m, cand_rg_m
 
+    def fast_single_move(self,
+                         demand,
+                         graph,
+                         cand_ht,
+                         cand_rg,
+                         alpha,
+                         is_w_replace=False,
+                         verbose_level=0):
+        if self.step % self.period == 0:
+            if is_w_replace:
+                is_end_try, e, e_rm, cand_ht_m = self.hiertopo_model.single_move_w_replace(
+                    demand, graph, cand_ht, alpha)
+            else:
+                is_end_try, e, cand_ht_m = self.hiertopo_model.single_move_wo_replace(
+                    demand, graph, cand_ht, alpha)
+                e_rm = []
+
+            cand_rg_m = copy.deepcopy(cand_rg)
+
+            if verbose_level > 1:
+                print(
+                    "[Step {0}] [HierTopo] end {1}, edge {2}, edge rm {3}, candidate {4}"
+                    .format(self.step, is_end_try, e, e_rm, cand_ht_m))
+
+        else:
+            is_end_try, e, cand_rg_m = self.rgreedy_model.single_move_wo_replace(
+                demand, graph, cand_rg)
+            e_rm = []
+            cand_ht_m = copy.deepcopy(cand_ht)
+
+            if verbose_level > 1:
+                print("[Step {0}] [RGreedy] end {1}, edge {2}, candidate {3}".
+                      format(self.step, is_end_try, e, cand_rg_m))
+
+        if not is_end_try:
+            n = self.hiertopo_model.edge_to_node(e)
+            graph.add_edge(n[0], n[1])
+
+            for e_r in e_rm:
+                n_r = self.hiertopo_model.edge_to_node(e_r)
+                graph.remove_edge(n_r[0], n_r[1])
+
+            if verbose_level > 0:
+                print("[Step {0}] Action: ({1}, {2}) remove {3}".format(
+                    self.step, n[0], n[1], e_rm))
+            self.step += 1
+
+            if e in cand_rg_m:
+                e_idx = cand_rg_m.index(e)
+                del cand_rg_m[e_idx]
+            if e in cand_ht_m:
+                e_idx = cand_ht_m.index(e)
+                del cand_ht_m[e_idx]
+
+        is_end = (is_end_try and self.end_pending)
+
+        if verbose_level > 1:
+            print(
+                "[Step {0}] [Safe] end {1}, edge {2}, candidate {3}, candidate {4}"
+                .format(self.step, is_end, e, cand_ht_m, cand_rg_m))
+
+        if is_end_try:
+            self.end_pending = True
+
+        return is_end, graph, cand_ht_m, cand_rg_m
+
     def fallback(self, is_end_ht, e_ht, is_end_rg, e_rg, e_rm_ht=[]):
         return self.fallback_period(is_end_ht, e_ht, is_end_rg, e_rg, e_rm_ht)
 
@@ -140,7 +207,7 @@ class SafeHierTopoAlg(object):
 
         return G
 
-    def run_sequential(self, params, graph, verbose_level=0):
+    def run_sequential(self, params, graph, fast=False, verbose_level=0):
         demand = params["demand"]
         alpha = params["alpha"]
         if "step" in params:
@@ -160,19 +227,30 @@ class SafeHierTopoAlg(object):
 
         is_end = False
         while self.step < step_lim and not is_end:
-            is_end, G, cand_ht, cand_rg = self.single_move(
-                demand,
-                G,
-                cand_ht,
-                cand_rg,
-                alpha,
-                is_w_replace=True,
-                verbose_level=verbose_level)
+            if fast:
+                is_end, G, cand_ht, cand_rg = self.fast_single_move(
+                    demand,
+                    G,
+                    cand_ht,
+                    cand_rg,
+                    alpha,
+                    is_w_replace=True,
+                    verbose_level=verbose_level)
+            else:
+                is_end, G, cand_ht, cand_rg = self.single_move(
+                    demand,
+                    G,
+                    cand_ht,
+                    cand_rg,
+                    alpha,
+                    is_w_replace=True,
+                    verbose_level=verbose_level)
 
         return G
 
     def reset(self):
         self.step = 0
+        self.end_pending = False
 
     def cal_pathlength(self, demand, graph):
         n_node = demand.shape[0]
@@ -271,7 +349,7 @@ def test_standalone(solution, n_data, dataset, n_node, n_degree, n_iter,
 
 
 def test_sequential(solution, dataset, n_node, n_degree, n_iter, n_maxstep, k,
-                    period, verbose_level):
+                    period, fast=False, verbose_level=0):
     hop_cnts = []
     steps = []
     routing_ports = []
@@ -292,6 +370,7 @@ def test_sequential(solution, dataset, n_node, n_degree, n_iter, n_maxstep, k,
         param["demand"] = dataset[i]
         G = safe_model.run_sequential(param,
                                       G_prev,
+                                      fast=fast,
                                       verbose_level=verbose_level)
         safe_model.reset()
         if i > 0:
@@ -383,6 +462,7 @@ def main():
                         help="The topology adjustment scheme",
                         default="replace",
                         choices=["replace", "add"])
+    parser.add_argument("-f", "--fast", action='store_true')
     args = parser.parse_args()
 
     k = args.k
@@ -462,6 +542,7 @@ def main():
             n_maxstep,
             k,
             fb_period,
+            args.fast,
             verbose_level=verbose_level)
         # print("result: {0} {1} {2} {3} {4} {5}".format(h_avg, h_std, s_avg,
         #    s_std, p_avg, p_std))
