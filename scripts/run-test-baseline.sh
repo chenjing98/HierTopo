@@ -2,14 +2,9 @@
 
 export CORE_COUNT=50
 
-declare -a nodes=(10 15 20 25 30 35 40 45 50)
-declare -a algs=("greedy" "egotree" "bmatch" "oblivious" "dijgreedy")
+declare -a nodes=(10 15 20 25 30 40 50)
+declare -a algs=("greedy" "bmatch" "dijgreedy")
 declare degree=(4)
-declare iter=(14)
-declare k=(3)
-declare -a node_param=(10 20 30)
-declare -a iter_param=(10 20 30)
-declare -a periods=(66 67)
 declare dataset=("scratch")
 declare -a adschemes=("replace" "add")
 

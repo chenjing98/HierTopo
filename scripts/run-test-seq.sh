@@ -2,13 +2,14 @@
 
 export CORE_COUNT=40
 
-declare -a nodes=(28 30 35 40 45 50)
+declare -a nodes=(10 15 20 25 30 40 50)
 declare degree=(4)
 declare iter=(14)
 declare k=(3)
-declare -a node_param=(10 20 30)
-declare -a iter_param=(10 20 30)
-declare -a periods=(66 67)
+declare -a node_param=(20)
+declare -a iter_param=(20)
+declare -a maxsteps=(30)
+declare -a periods=(1 2 5 10 30 50 100)
 declare dataset=("scratch")
 declare -a adschemes=("replace" "add")
 
@@ -35,6 +36,7 @@ run() {
     k_order=$9
     filename=${10}
     core_count=${11}
+    maxstep=${12}
     if [[ ${ad_scheme} == "add" ]]
     then
         file_solution="../poly_log/log${n_node_param}_${n_degree}_${k_order}_${n_iter_param}_same.pkl"
@@ -47,7 +49,7 @@ run() {
         return 1
     fi
     
-    output=$(python3 safehiertopo.py -n "${n_node}" -d "${n_degree}" -i "${n_iter}" -np "${n_node_param}" -ip "${n_iter_param}" -p "${period}" -k "${k_order}" -ds "${dataset_mode}" -a "${ad_scheme}" -c "${core_count}" -seq)
+    output=$(python3 safehiertopo.py -n "${n_node}" -d "${n_degree}" -i "${n_iter}" -np "${n_node_param}" -ip "${n_iter_param}" -p "${period}" -k "${k_order}" -ds "${dataset_mode}" -a "${ad_scheme}" -c "${core_count}" -s "${maxstep}" -seq)
     
     echo "$output" >> "${filename}".txt
     
@@ -86,7 +88,7 @@ run() {
         port_std="${BASH_REMATCH[1]}"
     fi
     
-    echo "${n_node}", "${n_iter}", "${n_node_param}", "${n_iter_param}", "${period}", "${ad_scheme}", "${hop_avg}", "${hop_std}", "${ttime}", "${step_avg}", "${step_std}", "${port_avg}", "${port_std}" >> "${filename}".csv
+    echo "${n_node}", "${n_iter}", "${n_node_param}", "${n_iter_param}", "${period}", "${maxstep}", "${ad_scheme}", "${hop_avg}", "${hop_std}", "${ttime}", "${step_avg}", "${step_std}", "${port_avg}", "${port_std}" >> "${filename}".csv
 }
 
 export -f run
@@ -95,10 +97,10 @@ filename="${RESULT_DIR}/fallback_sequential_new"
 
 echo Starts at "$(date +"%Y-%m-%d %H:%M:%S")" > ${filename}.txt
 echo Starts at "$(date +"%Y-%m-%d %H:%M:%S")" > ${filename}.csv
-echo n_node, n_iter, n_node_param, n_iter_param, fallback_period, ad_scheme, hop_avg, hop_std, ttime, step_avg, step_std, port_avg, port_std >> ${filename}.csv
+echo n_node, n_iter, n_node_param, n_iter_param, fallback_period, maxstep, ad_scheme, hop_avg, hop_std, ttime, step_avg, step_std, port_avg, port_std >> ${filename}.csv
 
 
-parallel -j${CORE_COUNT} run ::: "${nodes[@]}" ::: "${degree[0]}" ::: "${iter[0]}" ::: "${node_param[@]}" ::: "${iter_param[@]}" ::: "${periods[@]}" ::: "${dataset[0]}" ::: "${adschemes[@]}" ::: "${k[0]}" ::: "${filename}" ::: "${CORE_COUNT}"
+parallel -j${CORE_COUNT} run ::: "${nodes[@]}" ::: "${degree[0]}" ::: "${iter[0]}" ::: "${node_param[@]}" ::: "${iter_param[@]}" ::: "${periods[@]}" ::: "${dataset[0]}" ::: "${adschemes[@]}" ::: "${k[0]}" ::: "${filename}" ::: "${CORE_COUNT}" ::: "${maxsteps[@]}"
 
 
 echo Ends at "$(date +"%Y-%m-%d %H:%M:%S")" >> "${filename}".txt
