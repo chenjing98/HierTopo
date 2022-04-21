@@ -284,9 +284,25 @@ class SafeHierTopoAlg(object):
                 if i == j:
                     continue
                 # print(i, j, paths[i][j], paths_prev[i][j])
+                is_connected = self.check_connectivity(paths, i, j)
+                is_connected_prev = self.check_connectivity(paths_prev, i, j)
+                if (is_connected
+                        and not is_connected_prev) or (is_connected_prev
+                                                       and not is_connected):
+                    route_port_change += 1
+                    continue
+                if not is_connected and not is_connected_prev:
+                    continue
                 if not paths[i][j][1] == paths_prev[i][j][1]:
                     route_port_change += 1
         return link_change, route_port_change
+
+    def check_connectivity(self, paths, i, j):
+        if not i in paths:
+            return False
+        if not j in paths[i]:
+            return False
+        return True
 
 
 def test_mp(solution,
