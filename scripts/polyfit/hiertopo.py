@@ -25,7 +25,11 @@ class HierTopoPolynAlg(object):
         self.k = k
 
         self.permatch_model = permatch(n_node)
+        self.step = 0
 
+    def reset(self):
+        self.step = 0
+        
     def apply_policy(self, demand, alpha):
         """
         @param demand: (np.array) N x N
@@ -552,6 +556,29 @@ class HierTopoPolynAlg(object):
             n = self.edge_to_node(e)
             n0 = n[0]
             n1 = n[1]
+    
+    def run_sequential(self, params, graph, step_lim=1e4, verbose_level=0):
+        demand = params["demand"]
+        alpha = params["alpha"]
+
+        G = copy.deepcopy(graph)
+        # adj = np.array(nx.adjacency_matrix(G).todense(), np.float32)
+
+        cand_ht = []
+        for i in range(self.n_node - 1):
+            for j in range(i + 1, self.n_node):
+                cand_ht.append(i * self.n_node + j)
+
+        is_end = False
+        while self.step < step_lim and not is_end:
+            is_end, e, e_rm, cand_ht = self.single_move_w_replace(demand, G, cand_ht, alpha)
+            if not is_end:
+                n = self.edge_to_node(e)
+                G.add_edge(n[0], n[1])
+                for e_r in e_rm:
+                    n_r = self.edge_to_node(e_r)
+                    G.remove_edge(n_r[0], n_r[1])
+        return G
 
     def cal_pathlength(self, demand, graph):
         n_node = demand.shape[0]
@@ -566,6 +593,28 @@ class HierTopoPolynAlg(object):
             score += cur_path_length * demand[s, d]
         score /= (sum(sum(demand)))
         return score
+    
+    def cal_change(self, G, G_prev):
+        link_change = 0
+        route_port_change = 0
+
+        adj = np.array(nx.adjacency_matrix(G).todense(), np.float32)
+        adj_prev = np.array(nx.adjacency_matrix(G_prev).todense(), np.float32)
+        for i in range(self.n_node - 1):
+            for j in range(i + 1, self.n_node):
+                if not adj[i][j] == adj_prev[i][j]:
+                    link_change += 1
+
+        paths = dict(nx.all_pairs_shortest_path(G))
+        paths_prev = dict(nx.all_pairs_shortest_path(G_prev))
+        for i in range(self.n_node):
+            for j in range(self.n_node):
+                if i == j:
+                    continue
+                # print(i, j, paths[i][j], paths_prev[i][j])
+                if not paths[i][j][1] == paths_prev[i][j][1]:
+                    route_port_change += 1
+        return link_change, route_port_change
 
     def expand_orders_mat(self, feature):
         """
@@ -682,6 +731,45 @@ def test_mp(solution, test_size, dataset, n_node, n_degree, n_iter, n_maxstep,
     return output, output_std
 
 
+def test_sequential(solution, dataset, n_node, n_degree, n_iter, n_maxstep, k,
+                    verbose_level):
+    hop_cnts = []
+    steps = []
+    routing_ports = []
+
+    param = {}
+    param["alpha"] = solution
+
+    G_prev = nx.Graph()
+    G_prev.add_nodes_from(list(range(n_node)))
+
+    if verbose_level > 1:
+        print("Dataset loaded. Ready to run.")
+
+    model = HierTopoPolynAlg(n_node, n_degree, n_iter, n_maxstep, k)
+
+    for i in range(len(dataset)):
+        param["demand"] = dataset[i]
+        G = model.run_sequential(param,
+                                 G_prev,
+                                 step_lim=n_maxstep,
+                                 verbose_level=verbose_level)
+        model.reset()
+        if i > 0:
+            h = model.cal_pathlength(param["demand"], G)
+            s, p = model.cal_change(G, G_prev)
+            if verbose_level > 0:
+                print("[Topo {0}] {1} {2} {3}".format(i, h, s, p))
+
+            hop_cnts.append(h)
+            steps.append(s)
+            routing_ports.append(p)
+
+        G_prev = nx.Graph(G)
+
+    return np.mean(hop_cnts), np.std(hop_cnts), np.mean(steps), np.std(
+        steps), np.mean(routing_ports), np.std(routing_ports)
+
 def main():
 
     parser = argparse.ArgumentParser()
@@ -734,6 +822,14 @@ def main():
                         help="The topology adjustment scheme",
                         default="replace",
                         choices=["replace", "add"])
+    parser.add_argument("-seq", "--sequential", action='store_true')
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        type=int,
+        help=
+        "Level 0: no intermediate log, level 1: action log, level 2: more detailed state log",
+        default=0)
     args = parser.parse_args()
 
     k = args.k
@@ -746,6 +842,7 @@ def main():
 
     ad_scheme = args.ad_scheme
     data_source = args.data_source
+    verbose_level = args.verbose
 
     # ============ Setup testing datasets ============
     if data_source == "random":
@@ -791,13 +888,25 @@ def main():
     # ============ Start testing ============
     t_begin = timer()
 
-    pred, pred_std = test_mp(solution, n_testings, dataset, n_node, n_degree,
+    if args.sequential:
+        h_avg, h_std, s_avg, s_std, p_avg, p_std = test_sequential(solution, dataset, n_node, n_degree, n_iter, n_maxstep, k,
+                    verbose_level)
+        t_end = timer()
+        print("[Average Hop] {}".format(h_avg))
+        print("[Standard Deviation Hop] {}".format(h_std))
+        print("[Average Step] {}".format(s_avg))
+        print("[Standard Deviation Step] {}".format(s_std))
+        print("[Average Change Port] {}".format(p_avg))
+        print("[Standard Deviation Change Port] {}".format(p_std))
+        
+    else:
+        pred, pred_std = test_mp(solution, n_testings, dataset, n_node, n_degree,
                              n_iter, n_maxstep, k)
 
-    t_end = timer()
-    print(
-        "Prediction = {0}, std = {1}, test_time for {2} samples = {3}s".format(
-            pred, pred_std, n_testings, t_end - t_begin))
+        t_end = timer()
+        print(
+            "Prediction = {0}, std = {1}, test_time for {2} samples = {3}s".format(
+                pred, pred_std, n_testings, t_end - t_begin))
 
 
 if __name__ == "__main__":
