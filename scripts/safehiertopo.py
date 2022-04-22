@@ -61,7 +61,7 @@ class SafeHierTopoAlg(object):
                                         e_ht,
                                         is_end_rg,
                                         e_rg,
-                                        e_rm_ht=[])
+                                        e_rm_ht=e_rm)
 
         if not is_end:
             n = self.hiertopo_model.edge_to_node(e)
@@ -72,8 +72,8 @@ class SafeHierTopoAlg(object):
                 graph.remove_edge(n_r[0], n_r[1])
 
             if verbose_level > 0:
-                print("[Step {0}] Action: ({1}, {2})".format(
-                    self.step, n[0], n[1]))
+                print("[Step {0}] Action: ({1}, {2}) remove {3}".format(
+                    self.step, n[0], n[1], e_rm))
             self.step += 1
 
             if e in cand_rg_m:
